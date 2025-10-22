@@ -1,2 +1,5 @@
 print("Hello World")
-print(2)
+m = float(input("Masse ="))
+
+Fg = 9.81*m
+print(Fg)
