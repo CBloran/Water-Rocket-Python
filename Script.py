@@ -13,7 +13,7 @@ patm = 101325         # Pression atmosphérique (Pa)
 
 # Paramètres géométriques et initiaux du rocket
 #les noms avec o sont des paramètres à t = 0s (on peut pas mettre 0 dans la variable donc o)
-# les paramètres qu on ne connait pas son notés float pour l'instant
+# les paramètres qu'on ne connait pas sont notés float pour l'instant
 D = float()               # Diamètre de la fusée (m)
 De = float()            # Diamètre de la buse (m)
 A = math.pi * (D / 2)**2     # Aire frontale du rocket (m²)
