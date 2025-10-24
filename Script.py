@@ -12,7 +12,7 @@ gamma = 1.4           # Coefficient adiabatique de l'air
 patm = 101325         # Pression atmosphérique (Pa)
 
 # Paramètres géométriques et initiaux du rocket
-#les noms avec o sont des paramètres à t = 0s (on peut pas mettre 0 dans la variable donc o = initial, tandis que "in" comme dans p_ino est pour "interne")
+#les noms avec o sont des paramètres à t = 0s (on peut pas mettre 0 dans la variable donc o = initial, tandis que "in" comme dans p_ino est pour "intérieur" ou "interne")
 # les paramètres qu'on ne connait pas sont notés float pour l'instant
 D = float()               # Diamètre de la fusée (m)
 De = float()            # Diamètre de la buse (m)
