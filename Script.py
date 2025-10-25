@@ -4,7 +4,7 @@ import math
 # CONSTANTES PHYSIQUES ET PARAMÈTRES DU ROCKET À EAU
 # ============================================================
 
-g = 9.8               # Accélération de la gravité (m/s²)
+g = 9.81               # Accélération de la gravité (m/s²)
 rho_w = 1.0e3         # Densité de l'eau (kg/m³)
 rho_atm = 1.23        # Densité de l'air (kg/m³)
 Cd = 0.35             # Coefficient de traînée aérodynamique
@@ -14,14 +14,14 @@ patm = 101325         # Pression atmosphérique (Pa)
 # Paramètres géométriques et initiaux du rocket
 #les noms avec o sont des paramètres à t = 0s (on peut pas mettre 0 dans la variable donc o = initial, tandis que "in" comme dans p_ino est pour "intérieur" ou "interne")
 # les paramètres qu'on ne connait pas sont notés float pour l'instant
-D = float()               # Diamètre de la fusée (m)
-De = float()            # Diamètre de la buse (m)
+D = float(0.1)               # Diamètre de la fusée (m)
+De = float(0.02)            # Diamètre de la buse (m)
 A = math.pi * (D / 2)**2     # Aire frontale du rocket (m²)
 Ae = math.pi * (De / 2)**2   # Aire de la buse (m²)
 V = float()          # Volume total du rocket (m³)
-p_ino = float()           # Pression initiale à l'intérieur (Pa)
-mb = float()             # Masse structurelle (kg)
-Vwo = float()              # Volume d'eau initial dans la fusée
+p_ino = float(500000)           # Pression initiale à l'intérieur (Pa)
+mb = float(1.7)             # Masse structurelle (kg)
+Vwo = float(1.5)              # Volume d'eau initial dans la fusée
 mw = rho_w * Vwo
 k = Vwo /V
 
@@ -84,7 +84,8 @@ def gazi(Va):
     ma = rho_ino * (1-k)**V
     -> calcul de la masse d'air
     """
-    Vao = V - Vwo
+    Vao = V - Vwo # Volume d'air restant initial
+
     rho_ino = (rho_w * Vwo + rho_atm * Vao) / (Vwo + Vao)
     return p_ino * (Vao / Va)**gamma, rho_ino * (1-k)**Vwo
 
@@ -105,7 +106,8 @@ def rocket_dynamics(v, v_e):
     dmdt = -rho_w * Ae * v_e
 
     # --- Poussée instantanée (force exercée par l’eau sur le rocket)
-    F = -dmdt*v_e
+    #F = -dmdt*v_e //old
+    F = rho_w * Ae * v_e**2 # force de poussée en fonction de v_e plus interescent pour la resolution de l'equation differentielle
 
     # --- Forces aérodynamiques
     FD, W = FD_W(v)
@@ -117,3 +119,48 @@ def rocket_dynamics(v, v_e):
     dp_indt = -gamma * p_ino**((1+gamma)/gamma) * v_e * Ae / ((1-k) * V * p_ino**((1+gamma)/gamma))
 
     return F, dvdt, dp_indt
+
+
+#################----Runguert-Kutta----#######################
+
+##### Simulation parameters #####
+
+Tfinal = 2 # lenght of the simulation
+stepsNbr = 10 # number of steps in the simulation
+
+# Initial conditions
+y0 = 0 # Initial pos
+t0 = 0 # Initial time
+
+# differential equation dy/dt = f(t, y)
+def f(t, y): 
+    dydt = -9.81*t + 10
+
+    return dydt
+
+##### FUNCTION #####
+def RungeKutta(_y0, _t0, _stepsNbr, _Tfinal):
+    ts = [_t0] # Time list
+    ys = [_y0] # Solution list
+
+    deltaT = _Tfinal / _stepsNbr
+
+    for i in range(_stepsNbr):
+
+        m1 = f(ts[-1], ys[-1])
+        m2 = f(ts[-1] + deltaT / 2, ys[-1] + m1 * deltaT / 2)
+        m3 = f(ts[-1] + deltaT / 2, ys[-1] + m2 * deltaT / 2)
+        m4 = f(ts[-1] + deltaT, ys[-1] + m3 * deltaT)
+        m = (m1 + 2 * m2 + 2 * m3 + m4) / 6
+        
+        next_y = ys[-1] + m * deltaT
+
+        ts.append(ts[-1] + deltaT)
+        ys.append(next_y)
+
+
+        if abs(ys[-2] - ys[-1]) < 0.001 :  # stop when the value change is negligible
+            break
+
+    print("ronguekutta", ts)
+    print("ronguekutta", ys)
