@@ -120,116 +120,37 @@ def rocket_dynamics(v, v_e):
 
     return F, dvdt, dp_indt
 
-#========================================================
-#######             FONCTION GRAPHIQUE           ########
-#========================================================
-def graphique_temporel(donnees_x, donnees_y, largeur=80, hauteur=20, couleur_points='rouge'):
-    # Codes de couleurs ANSI
-    couleurs = {
-        'rouge': '\033[91m',
-        'vert': '\033[92m',
-        'jaune': '\033[93m',
-        'bleu': '\033[94m',
-        'magenta': '\033[95m',
-        'cyan': '\033[96m',
-        'blanc': '\033[97m',
-        'reset': '\033[0m'
-    }
-    
-    # Sélectionner la couleur
-    couleur_code = couleurs.get(couleur_points, couleurs['rouge'])
-    reset_code = couleurs['reset']
-    
-    if len(donnees_x) != len(donnees_y):
-        print(f"Erreur: Les listes X ({len(donnees_x)}) et Y ({len(donnees_y)}) doivent avoir la même taille")
-        return
-    
-    if len(donnees_x) == 0:
-        print("Aucune donnée à afficher")
-        return
-    
-    # Normaliser les données X et Y
-    min_x = min(donnees_x)
-    max_x = max(donnees_x)
-    min_y = min(donnees_y)
-    max_y = max(donnees_y)
-    
-    amplitude_x = max_x - min_x if max_x != min_x else 1
-    amplitude_y = max_y - min_y if max_y != min_y else 1
-    
-    # Normaliser les positions dans la grille
-    positions_x = [
-        int((x - min_x) / amplitude_x * (largeur - 1))
-        for x in donnees_x
-    ]
-    
-    positions_y = [
-        int((y - min_y) / amplitude_y * (hauteur - 3))  # -3 pour l'espace des légendes
-        for y in donnees_y
-    ]
-    
-    # Créer la grille
-    grille = [[' ' for _ in range(largeur)] for _ in range(hauteur)]
-    
-    # Dessiner l'axe horizontal
-    for i in range(largeur):
-        grille[hauteur-2][i] = '─'
-    
-    # Dessiner l'axe vertical
-    for i in range(hauteur-2):
-        grille[i][0] = '│'
-    
-    # Origine
-    grille[hauteur-2][0] = '└'
-    
-    # Dessiner la courbe (lignes en noir)
-    for i in range(len(positions_x) - 1):
-        x1 = positions_x[i]
-        x2 = positions_x[i + 1]
-        y1 = hauteur - 2 - positions_y[i]
-        y2 = hauteur - 2 - positions_y[i + 1]
-        
-        # Dessiner une ligne entre les points consécutifs (sans couleur)
-        if x1 != x2:  # Éviter la division par zéro
-            for x in range(min(x1, x2), min(max(x1, x2) + 1, largeur)):
-                t = (x - x1) / (x2 - x1)
-                y = int(y1 + t * (y2 - y1))
-                if 0 <= y < hauteur - 1 and x < largeur:
-                    grille[y][x] = '•'
-        
-        # Marquer les points de données (AVEC COULEUR)
-        if 0 <= y1 < hauteur - 1 and x1 < largeur:
-            grille[y1][x1] = f"{couleur_code}●{reset_code}"
-    
-    # Dernier point (AVEC COULEUR)
-    dernier_x = positions_x[-1]
-    dernier_y = hauteur - 2 - positions_y[-1]
-    if 0 <= dernier_y < hauteur - 1 and dernier_x < largeur:
-        grille[dernier_y][dernier_x] = f"{couleur_code}●{reset_code}"
-    
-    # Afficher le graphique
-    print("\n" + "GRAPHIQUE X-Y".center(largeur))
-    print("─" * largeur)
-    
-    for i, ligne in enumerate(grille):
-        # Convertir la liste en string pour l'affichage
-        ligne_affichage = ''.join(ligne)
-        if i == 0:
-            print(f"{max_y:8.2f} │{ligne_affichage}")
-        elif i == hauteur - 2:
-            print(f"{min_y:8.2f} │{ligne_affichage}")
-        else:
-            print(f"        │{ligne_affichage}")
-    
-    print(" " * 9 + "└" + "─" * (largeur-1))
-    print(f" " * 9 + f"{min_x:.2f}" + " " * (largeur-20) + f"{max_x:.2f}")
-    
-    # Statistiques
-    print(f"\nPoints: {len(donnees_x)}")
-    print(f"X: min={min_x:.2f}, max={max_x:.2f}")
-    print(f"Y: min={min_y:.2f}, max={max_y:.2f}")
-    print(f"Couleur des points: {couleur_points}")
 
+
+
+#=======================================================
+########           Graphique txt             ##########
+#=======================================================
+
+# fonction d'affichage des de liste de données suivant l'axe vertical parce que c est plus facil et que ca marche tout aussi bien
+
+
+def txtGraph(xs: list, ys: list):
+    source_file = open("Output.txt", "w")
+    x_simple = xs[:] ##[1, 2.1, 3.6, 4.4, 5.5, 6, 7, 8, 9, 10]  test data
+    y_simple = ys[:] ##[2.1, 4, 6, 8, 10, 8.5, 6.6, 4.8, 2.8, 0] test data
+
+    for i in range(len(x_simple)):       # only keep the rounded value of our data because we cant use decimal number to set the position of the text
+        x_simple[i] = round(x_simple[i])
+        y_simple[i] = round(y_simple[i])
+
+    max_x = max(x_simple)                
+    max_y = max(y_simple)                # find the max value of the list to adjust the pos of the text    
+    
+
+    for i in range(len(y_simple)):
+        line = (y_simple[i] - 1) * " " + str(round(ys[i], 1)) + (max_y - y_simple[i]) * " "
+        source_file.write(line + "\n")
+    
+    
+        
+                
+    
 #=======================================================
 ########           Runguert-Kutta             ##########
 #=======================================================
@@ -281,8 +202,9 @@ def RungeKutta(_y0, _t0, _stepsNbr, _Tfinal):
     
     # Appel avec couleur bleue
     ##graphique_temporel(x_simple, y_simple, 40, 40, 'bleu')
-    graphique_temporel(x_simple, y_simple, 40, 40, 'vert')
+    ##graphique_temporel(x_simple, y_simple, 20, 20, 'vert')
+    txtGraph(ts, ys)
     return (ts, ys)
 
-
+#txtGraph()
 tsys = RungeKutta(y0, t0, stepsNbr, Tfinal)
