@@ -24,10 +24,10 @@ mb = float(1.7)             # Masse structurelle (kg)
 Vwo = float(1.5)              # Volume d'eau initial dans la fusée
 mw = rho_w * Vwo
 k = Vwo /V
-
+k0 = Vwo_in/V
 #retranscription des équations du document que j'ai (Alexandre) présenté, les arguments des fonctions
 #permettent de connaître les paramètres / variables à mesurer/calculer
-
+v_e=((2*(p_ino*((1-k0)/(1-k))**(gamma)-patm))/((rho_w)*(1-((Ae)/(A))**2)))**(1/2)
 # ============================================================
 # (1) ÉQUATION DE VARIATION DE LA MASSE D'EAU
 # ============================================================
