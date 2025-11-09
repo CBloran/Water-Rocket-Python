@@ -1,238 +1,217 @@
 import math
 
+
 # ============================================================
-# CONSTANTES PHYSIQUES (À AJOUTER)
+# CONSTANTES PHYSIQUES RÉALISTES
 # ============================================================
-g = 9.81
-rho_w = 1000
-rho_atm = 1.23
-Cd = 0.35
-gamma = 1.4
-patm = 101325
 
-# Paramètres fusée (À AJOUTER)
-D = 0.1
-De = 0.02
-A = math.pi * (D/2)**2
-Ae = math.pi * (De/2)**2
-V = 0.002
-p_ino = 500000
-mb = 1.7
-Vwo = 1
+g = 9.81               # Gravité (m/s²)
+rho_w = 1000.0         # Densité eau (kg/m³)
+rho_air = 1.225        # Densité air (kg/m³)
+Cd = 0.35               # Coefficient traînée (fusée typique)
+patm = 101325          # Pression atmosphérique (Pa)
 
-def FD_W(v):
-    """Calcule traînée et poids"""
-    FD = 0.5 * rho_atm * v**2 * Cd * A
-    W = mb * g
-    return FD, W
+# Paramètres FUSÉE RÉALISTE
+D_body = 0.1           # Diamètre fusée (m)
+A_cross = math.pi * (D_body/2)**2  # Section frontale
+D_nozzle = 0.02       # Diamètre buse (m) - PLUS PETIT
+A_nozzle = math.pi * (D_nozzle/2)**2
 
-def internal_pressure(Vw):
-    """
-    Vw : volume d'eau restant
-    Calcul de la pression interne en fonction du volume d'eau restant.
-    """
-    Va = V - Vw  # remaining air volume
-    Vao = V - Vwo  # initial air volume
+V_total = 0.0015        # Volume total 2L
+V_water_initial = 0.0005 # Volume eau initial 1L
+V_air_initial = V_total - V_water_initial
 
-    if Va > 0:
-        p_in = p_ino * (Vao / Va)**gamma # calculate the remaining internal pressure based on adiabatic law
-        return p_in
-    else:
-        return patm 
+p0 = 500000           # Pression initiale 4 bars
+m_dry = 0.1           # Masse à vide 500g - PLUS LÉGER
 
-def water_exit_velocity(k, p_in):
-    """
-    k : ratio of remaining water volume to total volume
-    p_in : internal pressure
-    """
-    try:
-        v_e = math.sqrt((2 * (p_in - patm)) / (rho_w * (1 - (Ae / A)**2))) #calculate the exit velocity of water based on bernouilli's equation
-        return v_e
-    except:
-        return 0
+print("=== PARAMÈTRES FUSÉE ===")
+print(f"Volume eau: {V_water_initial*1000:.0f}mL")
+print(f"Volume air: {V_air_initial*1000:.0f}mL") 
+print(f"Pression: {p0/1000:.0f} kPa")
+print(f"Masse sèche: {m_dry:.1f}kg")
+print(f"Surface buse: {A_nozzle*10000:.1f} cm²")
 
-# =========================================================================
-# ÉQUATIONS DIFFÉRENTIELLES SÉPARÉES (CORRIGÉES)
-# =========================================================================
-def equation_pos(v, Vw):
-    """dh/dt = v"""
-    return v
-
-def equation_vel(v, Vw):
-    """dv/dt = f(v, Vw)"""
-    if Vw <= 0 and v <= 0:
-        return 0
-    
-    p_in = internal_pressure(Vw)
-    k = Vw / V
-    v_e = water_exit_velocity(k, p_in)
-    mw = rho_w * Vw
-
-    if Vw > 0:
-        F_thrust = rho_w * Ae * v_e**2
-    else:
-        F_thrust = 0
-
-    F_drag, F_weight_base = FD_W(v)
-    F_weight = F_weight_base + mw * g  # Ajouter le poids de l'eau
-
-    if Vw > 0:
-        return (F_thrust - F_drag - F_weight) / (mb + mw)
-    else:
-        return (- F_drag - F_weight) / mb
-
-def equation_water_volume(v, Vw):
-    """dVw/dt = f(v, Vw)"""
-    if Vw <= 0:
-        return 0
-    
-    p_in = internal_pressure(Vw)
-    k = Vw / V
-    v_e = water_exit_velocity(k, p_in)
-
-    if Vw > 0:
-        return -Ae * v_e
-    else:
-        return 0
-    
-def txtGraph(xs: list, ys: list):
-    source_file = open("Output.txt", "w")
-    x_simple = xs[:] ##[1, 2.1, 3.6, 4.4, 5.5, 6, 7, 8, 9, 10]  test data
-    y_simple = ys[:] ##[2.1, 4, 6, 8, 10, 8.5, 6.6, 4.8, 2.8, 0] test data
-
-    for i in range(len(x_simple)):       # only keep the rounded value of our data because we cant use decimal number to set the position of the text
-        x_simple[i] = round(x_simple[i])
-        y_simple[i] = round(y_simple[i])
-
-    max_x = max(x_simple)                
-    max_y = max(y_simple)                # find the max value of the list to adjust the pos of the text    
-    
-
-    for i in range(len(y_simple)):
-        line = (y_simple[i] - 1) * " " + str(round(ys[i], 1)) + (max_y - y_simple[i]) * " "
-        source_file.write(line + "\n")
-
-# =========================================================================
-# RUNGE-KUTTA CORRIGÉ
-# =========================================================================
-def Rungekutta(t0, h0, v0, Vw0, stepNbr, Tfinal):
-    
-    def systeme_complet(h, v, Vw):
-        """
-        Retourne [dh_dt, dv_dt, dVw_dt]
-        """
-        return [
-            equation_pos(v, Vw),           # dh/dt
-            equation_vel(v, Vw),           # dv/dt  
-            equation_water_volume(v, Vw)   # dVw/dt
-        ]
-    
-    ts = [t0]
-    hs = [h0]
-    vs = [v0]
-    Vws = [Vw0]
-
-    deltaT = Tfinal / stepNbr
-    
-    print(f"DEBUG: Début simulation - deltaT={deltaT}")
-    print(f"DEBUG: Conditions initiales - h0={h0}, v0={v0}, Vw0={Vw0}")
-
-    for i in range(stepNbr):
-        t_current = ts[-1]
-        h_current = hs[-1]
-        v_current = vs[-1]
-        Vw_current = Vws[-1]
+class WaterRocket:
+    def __init__(self):
+        self.g = g
+        self.rho_w = rho_w
+        self.rho_air = rho_air
+        self.Cd = Cd
+        self.patm = patm
+        self.A_cross = A_cross
+        self.A_nozzle = A_nozzle
+        self.V_total = V_total
+        self.V_water = V_water_initial
+        self.V_air = V_air_initial
+        self.pressure = p0
+        self.m_dry = m_dry
+        self.m_water = rho_w * V_water_initial
         
-        print(f"DEBUG: Step {i} - t={t_current:.3f}, h={h_current:.3f}, v={v_current:.3f}, Vw={Vw_current:.6f}")
-
-        # POINT 1
-        k1 = systeme_complet(h_current, v_current, Vw_current)
-        print(f"DEBUG: k1 = {k1}")
+    def update(self, dt):
+        """Mise à jour physique sur un pas de temps dt"""
         
-        # POINT 2
-        k2 = systeme_complet(
-            h_current + deltaT/2 * k1[0], 
-            v_current + deltaT/2 * k1[1], 
-            Vw_current + deltaT/2 * k1[2]
-        )
+        # 1. ÉJECTION DE L'EAU (si il reste de l'eau et pression suffisante)
+        thrust = 0
+        if self.V_water > 0 and self.pressure > self.patm:
+            # Vitesse d'éjection (Bernoulli)
+            v_ejection = math.sqrt(2 * (self.pressure - self.patm) / self.rho_w)
+            
+            # Débit volumique
+            Q = self.A_nozzle * v_ejection
+            
+            # Masse d'eau éjectée
+            dm_water = self.rho_w * Q * dt
+            dm_water = min(dm_water, self.m_water)  # Ne pas éjecter plus que disponible
+            
+            if dm_water > 0:
+                # Mise à jour masse et volume eau
+                self.m_water -= dm_water
+                self.V_water = self.m_water / self.rho_w
+                
+                # Force de poussée (F = dm/dt * v)
+                thrust = (dm_water / dt) * v_ejection
+                
+                # Expansion adiabatique de l'air
+                self.V_air = self.V_total - self.V_water
+                if self.V_air > 0:
+                    # Loi adiabatique: P * V^γ = constante
+                    gamma = 1.4
+                    self.pressure = p0 * (V_air_initial / self.V_air) ** gamma
+                else:
+                    self.pressure = self.patm
         
-        # POINT 3
-        k3 = systeme_complet(
-            h_current + deltaT/2 * k2[0],
-            v_current + deltaT/2 * k2[1], 
-            Vw_current + deltaT/2 * k2[2]
-        )
+        return thrust
+    
+    def get_mass(self):
+        return self.m_dry + self.m_water
+    
+    def get_drag(self, velocity):
+        """Force de traînée"""
+        if abs(velocity) < 0.1:
+            return 0
+        return 0.5 * self.rho_air * velocity**2 * self.Cd * self.A_cross
+
+def simulate_rocket():
+    """Simulation complète de la trajectoire"""
+    
+    rocket = WaterRocket()
+    
+    # Conditions initiales
+    t = 0
+    dt = 0.01  # Pas de temps 10ms
+    y = 0.1    # Hauteur initiale (départ du sol)
+    v = 0.0    # Vitesse initiale
+    phase = "PROPULSION"
+    
+    # Stockage résultats
+    times = [t]
+    heights = [y]
+    velocities = [v]
+    thrusts = [0]
+    masses = [rocket.get_mass()]
+    pressures = [rocket.pressure]
+    
+    max_height = 0
+    water_depleted_time = 0
+    
+    print("\n=== DÉBUT SIMULATION ===")
+    
+    while y > 0 or t < 1:  # Simuler jusqu'au sol ou minimum 1s
+        # Calcul forces
+        thrust = rocket.update(dt)
+        drag = rocket.get_drag(v)
+        weight = rocket.get_mass() * g
         
-        # POINT 4
-        k4 = systeme_complet(
-            h_current + deltaT * k3[0],
-            v_current + deltaT * k3[1],
-            Vw_current + deltaT * k3[2]
-        )
-
-        # MOYENNE PONDÉRÉE
-        m_h = (k1[0] + 2*k2[0] + 2*k3[0] + k4[0]) / 6
-        m_v = (k1[1] + 2*k2[1] + 2*k3[1] + k4[1]) / 6
-        m_Vw = (k1[2] + 2*k2[2] + 2*k3[2] + k4[2]) / 6
-
-        # MISE À JOUR
-        new_h = h_current + deltaT * m_h
-        new_v = v_current + deltaT * m_v
-        new_Vw = Vw_current + deltaT * m_Vw
+        # Accélération (F = ma)
+        if rocket.get_mass() > 0.01:  # Éviter division par zéro
+            acceleration = (thrust - drag - weight) / rocket.get_mass()
+        else:
+            acceleration = -g  # Chute libre
+            
+        # Intégration vitesse et position
+        v += acceleration * dt
+        y += v * dt
         
-        print(f"DEBUG: Nouveaux - h={new_h:.3f}, v={new_v:.3f}, Vw={new_Vw:.6f}")
-
-        hs.append(new_h)
-        vs.append(new_v)
-        Vws.append(new_Vw)
-        ts.append(t_current + deltaT)
-
-        # Conditions d'arrêt
-        if new_h <= 0:  # Au sol
-            print("DEBUG: Impact au sol - arrêt")
-            hs[-1] = 0
-            vs[-1] = 0
+        # Mise à jour temps
+        t += dt
+        
+        # Détection fin eau
+        if rocket.V_water <= 0.000001 and water_depleted_time == 0:
+            water_depleted_time = t
+            phase = "BALLISTIQUE"
+            print(f"→ Phase balistique à t={t:.2f}s, h={y:.1f}m, v={v:.1f}m/s")
+        
+        # Stockage données
+        times.append(t)
+        heights.append(max(y, 0))
+        velocities.append(v)
+        thrusts.append(thrust)
+        masses.append(rocket.get_mass())
+        pressures.append(rocket.pressure)
+        
+        max_height = max(max_height, y)
+        
+        # Arrêt si au sol depuis un moment
+        if y <= 0 and t > 2:
             break
             
-        if new_Vw <= 0:  # Plus d'eau
-            print("DEBUG: Plus d'eau - arrêt")
-            Vws[-1] = 0
+        # Sécurité durée
+        if t > 30:
             break
-
-    print(f"DEBUG: Simulation terminée - {len(ts)} points calculés")
-    return ts, hs, vs, Vws
-
-# Test avec des paramètres plus réalistes
-Tfinal = 2  # Réduire le temps
-stepsNbr = 50  # Réduire le nombre d'étapes pour voir ce qui se passe
-
-# Conditions initiales
-t0 = 0.0
-h0 = 0.001    # Légèrement au dessus du sol
-v0 = 0.0
-Vw0 = 1   # Volume d'eau réaliste
-
-print("=== DÉBUT SIMULATION ===")
-ts, hs, vs, Vws = Rungekutta(t0, h0, v0, Vw0, stepsNbr, Tfinal)
-
-if len(ts) > 1:
-    print(f"\n=== RÉSULTATS ===")
-    print(f"Points calculés: {len(ts)}")
-    print(f"Altitude max: {max(hs):.3f} m")
-    print(f"Vitesse max: {max(vs):.3f} m/s")
-    print(f"Temps final: {ts[-1]:.3f} s")
-    print(f"Volume eau final: {Vws[-1]:.6f} m³")
     
-    # Afficher les premiers points
-    print(f"\nPremiers points:")
-    for i in range(min(5, len(ts))):
-        print(f"t={ts[i]:.3f}s, h={hs[i]:.3f}m, v={vs[i]:.3f}m/s")
-else:
-    print("ERREUR: Aucun point calculé!")
+    # Analyse résultats
+    print("\n=== RÉSULTATS ===")
+    print(f"Temps simulation: {t:.2f}s")
+    print(f"Hauteur maximale: {max_height:.1f}m")
+    print(f"Vitesse maximale: {max([abs(v) for v in velocities]):.1f}m/s")
+    print(f"Poussée max: {max(thrusts):.1f}N")
+    print(f"Temps propulsion: {water_depleted_time:.2f}s")
+    
+    if max_height < 5:
+        print("\n⚠️  HAUTEUR TROP FAIBLE - VÉRIFIER PARAMÈTRES")
+        print("Suggestions:")
+        print("- Augmenter pression initiale")
+        print("- Réduire masse sèche")
+        print("- Augmenter volume eau")
+        print("- Agrandir diamètre buse")
+    
+    return times, heights, velocities, thrusts, masses, pressures
 
-# Test simple de txtGraph avec des données de test
-print("\n=== TEST txtGraph ===")
-test_t = [0, 1, 2, 3]
-test_h = [0, 10, 20, 15]
-txtGraph(test_t, test_h)
-print("Fichier Output.txt créé")
+def create_ascii_trajectory(times, heights):
+    """Crée une visualisation ASCII de la trajectoire"""
+    if not heights:
+        return
+    
+    max_h = max(heights)
+    scale_h = 50.0 / max_h if max_h > 0 else 1
+    scale_t = len(times) / 50  # Échantillonnage temporel
+    
+    print(f"\n📈 TRAJECTOIRE (max: {max_h:.1f}m)")
+    print("=" * 60)
+    
+    for i in range(0, len(times), max(1, int(scale_t))):
+        if i < len(heights) and heights[i] >= 0:
+            h_display = heights[i] * scale_h
+            bar = "█" * int(h_display)
+            print(f"t={times[i]:5.2f}s | h={heights[i]:5.1f}m {bar}")
+
+# ============================================================
+# EXÉCUTION
+# ============================================================
+
+if __name__ == "__main__":
+    print("SIMULATION FUSÉE À EAU")
+    print("Modèle physique réaliste avec propulsion par éjection d'eau")
+    
+    times, heights, velocities, thrusts, masses, pressures = simulate_rocket()
+    
+    create_ascii_trajectory(times, heights)
+    
+    # Sauvegarde données
+    with open("rocket_trajectory.txt", "w") as f:
+        f.write("t(s)\th(m)\tv(m/s)\tF(N)\tm(kg)\tp(Pa)\n")
+        for i in range(len(times)):
+            f.write(f"{times[i]:.3f}\t{heights[i]:.3f}\t{velocities[i]:.3f}\t")
+            f.write(f"{thrusts[i]:.1f}\t{masses[i]:.3f}\t{pressures[i]:.0f}\n")
+    
+    print(f"\n💾 Données sauvegardées dans 'rocket_trajectory.txt'")
