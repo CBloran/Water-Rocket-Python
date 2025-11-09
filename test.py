@@ -22,7 +22,7 @@ V_water_initial = 0.0005 # Volume eau initial 1L
 V_air_initial = V_total - V_water_initial
 
 p0 = 500000           # Pression initiale 4 bars
-m_dry = 0.1           # Masse à vide 500g - PLUS LÉGER
+m_dry = 0.2          # Masse à vide 500g - PLUS LÉGER
 
 print("=== PARAMÈTRES FUSÉE ===")
 print(f"Volume eau: {V_water_initial*1000:.0f}mL")
@@ -98,8 +98,8 @@ def simulate_rocket():
     
     # Conditions initiales
     t = 0
-    dt = 0.01  # Pas de temps 10ms
-    y = 0.1    # Hauteur initiale (départ du sol)
+    dt = 0.0001  # Pas de temps 10ms
+    y = 0.001    # Hauteur initiale (départ du sol)
     v = 0.0    # Vitesse initiale
     phase = "PROPULSION"
     

@@ -18,13 +18,13 @@ D = float(0.1)               # Diamètre de la fusée (m)
 De = float(0.02)            # Diamètre de la buse (m)
 A = math.pi * (D / 2)**2     # Aire frontale du rocket (m²)
 Ae = math.pi * (De / 2)**2   # Aire de la buse (m²)
-V = float(0.0015)          # Volume total du rocket (m³)
+V = float(0.002)          # Volume total du rocket (m³)
 p_ino = float(500000)           # Pression initiale à l'intérieur (Pa)
 mb = float(1.7)             # Masse structurelle (kg)
-Vw0 = float(0.0005)              # Volume d'eau initial dans la fusée
-mw = rho_w * Vw0
-k = Vw0 /V
-k0 = Vw0/V
+Vwo = float(1.5)              # Volume d'eau initial dans la fusée
+mw = rho_w * Vwo
+k = Vwo /V
+k0 = Vwo/V
 
 #retranscription des équations du document que j'ai (Alexandre) présenté, les arguments des fonctions
 #permettent de connaître les paramètres / variables à mesurer/calculer
@@ -76,19 +76,19 @@ def gazi(Va):
     """
     Va : le volume d'air à un instant t
     Équation (5) :
-    p_in = p_ino * (Va0 / Va)^gamma
+    p_in = p_ino * (Vao / Va)^gamma
     -> décrit la diminution de la pression interne selon la loi adiabatique.
-    Va0 = V - Vw
+    Vao = V - Vw
     -> le volume d'air initial vaut le total  moins le volume d'eau
     rho_ino = (rho_w*Vw+rho_atm*Va)/(Vw+Va)
     -> calcul du rho initial du mélange eau-air dans le réservoir
     ma = rho_ino * (1-k)**V
     -> calcul de la masse d'air
     """
-    Va0 = V - Vw0 # Volume d'air restant initial
+    Vao = V - Vwo # Volume d'air restant initial
 
-    rho_ino = (rho_w * Vw0 + rho_atm * Va0) / (Vw0 + Va0)
-    return p_ino * (Va0 / Va)**gamma, rho_ino * (1-k)**Vw0
+    rho_ino = (rho_w * Vwo + rho_atm * Vao) / (Vwo + Vao)
+    return p_ino * (Vao / Va)**gamma, rho_ino * (1-k)**Vwo
 
 # ============================================================
 # (6) SYSTÈME D'ÉQUATIONS DIFFÉRENTIELLES DE LA PHASE PROPULSIVE
@@ -130,14 +130,12 @@ def internal_pressure(Vw):
     Calcul de la pression interne en fonction du volume d'eau restant.
     """
     Va = V - Vw  # remaining air volume
-    Va0 = V - Vw0  # initial air volume
+    Vao = V - Vwo  # initial air volume
 
     if Va > 0:
-        p_in = p_ino * (Va0 / Va)**gamma # calculate the remaining internal pressure based on adiabatic law
-        print(p_in)
+        p_in = p_ino * (Vao / Va)**gamma # calculate the remaining internal pressure based on adiabatic law
         return p_in
     else:
-        print("Water has been completely expelled")
         return patm 
 
 def water_exit_velocity(k, p_in):
@@ -147,7 +145,6 @@ def water_exit_velocity(k, p_in):
     """
     try:
         v_e = math.sqrt((2 * (p_in - patm)) / (rho_w * (1 - (Ae / A)**2))) #calculate the exit velocity of water based on bernouilli's equation
-        print("v_e : ", v_e)
         return v_e
     except:
         return 0
@@ -197,8 +194,8 @@ def equation_pos(V, Vw):
 
 def equation_vel(v, Vw):
 
-    #if Vw <= 0 and v <= 0:
-    #    return 0, 0, 0, 0  # Fin de la phase propulsive lorsque tout l'eau est expulsée
+    if Vw <= 0 and v <= 0:
+        return 0, 0, 0, 0  # Fin de la phase propulsive lorsque tout l'eau est expulsée
     
     p_in = internal_pressure(Vw)          # calculate the internal pressure
     k = Vw / V                            # calculate the ratio of remaining water volume to total volume
@@ -230,7 +227,6 @@ def equation_water_volume(v, Vw):
         dVw_dt = -Ae * v_e        # rate of change of water volume
         return dVw_dt
     else:
-        Vw = 0
         return 0
     
 
@@ -269,12 +265,24 @@ def txtGraph(xs: list, ys: list):
 ##### Simulation parameters #####
 
 Tfinal = 4 # lenght of the simulation
-stepsNbr = 100 # number of steps in the simulation
+stepsNbr = 20 # number of steps in the simulation
 
 # Initial conditions
 t0 = 0.00001 # Initial time
 h0 = 0.00001 # Initial height
 v0 = 0 # Initial velocity
+Vw0 = 1
+
+# differential equation dy/dt = f(t, y)
+def f(t, y): 
+    dydt = -9.81*t + 20
+
+    return dydt
+
+
+
+
+
 
 
 
@@ -344,9 +352,9 @@ def Rungekutta(t0, h0, v0, Vw0, stepNbr, Tfinal):
             vs[-1] = 0
             break
             
-        
-    #txtGraph(ts, hs)
-    print(hs)
+        if Vws[-1] <= 0:  # Plus d'eau
+            Vws[-1] = 0
+    txtGraph(ts, hs)
     return ts, hs, vs, Vws
 
 
@@ -354,4 +362,3 @@ def Rungekutta(t0, h0, v0, Vw0, stepNbr, Tfinal):
 
 #txtGraph()
 tsys = Rungekutta(t0, h0, v0, Vw0, stepsNbr, Tfinal)
-txtGraph(tsys[0], tsys[1])
