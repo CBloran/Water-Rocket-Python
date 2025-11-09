@@ -24,7 +24,8 @@ mb = float(1.7)             # Masse structurelle (kg)
 Vwo = float(1.5)              # Volume d'eau initial dans la fusée
 mw = rho_w * Vwo
 k = Vwo /V
-k0 = Vwo_in/V
+k0 = Vwo/V
+
 #retranscription des équations du document que j'ai (Alexandre) présenté, les arguments des fonctions
 #permettent de connaître les paramètres / variables à mesurer/calculer
 v_e=((2*(p_ino*((1-k0)/(1-k))**(gamma)-patm))/((rho_w)*(1-((Ae)/(A))**2)))**(1/2)
@@ -120,7 +121,114 @@ def rocket_dynamics(v, v_e):
 
     return F, dvdt, dp_indt
 
+########################################################################################################
+######################    WORKING ON A COMPLETE REWORK OF THE DIFFERENTIAL EQUATIONS SYSTEM   ##########
+########################################################################################################
+def internal_pressure(Vw):
+    """
+    Vw : volume d'eau restant
+    Calcul de la pression interne en fonction du volume d'eau restant.
+    """
+    Va = V - Vw  # remaining air volume
+    Vao = V - Vwo  # initial air volume
 
+    if Va > 0:
+        p_in = p_ino * (Vao / Va)**gamma # calculate the remaining internal pressure based on adiabatic law
+        return p_in
+    else:
+        return patm 
+
+def water_exit_velocity(k, p_in):
+    """
+    k : ratio of remaining water volume to total volume
+    p_in : internal pressure
+    """
+    try:
+        v_e = math.sqrt((2 * (p_in - patm)) / (rho_w * (1 - (Ae / A)**2))) #calculate the exit velocity of water based on bernouilli's equation
+        return v_e
+    except:
+        return 0
+    
+
+
+def thrust_phase_system(t, v, Vw):
+    """
+    t : time
+    v : speed
+    Vw : remaining water volume
+    differential equations system during the thrust phase
+    """
+
+    if Vw <= 0 and v <= 0:
+        return 0, 0, 0, 0  # Fin de la phase propulsive lorsque tout l'eau est expulsée
+    
+    p_in = internal_pressure(Vw)          # calculate the internal pressure
+    k = Vw / V                            # calculate the ratio of remaining water volume to total volume
+    v_e = water_exit_velocity(k, p_in)    # calculate the exit velocity of water
+
+    mw = rho_w * Vw                       # calculate the remaining water mass
+    if Vw > 0:
+        F_thrust = rho_w * Ae * v_e**2        # calculate the thrust force
+    else:
+        F_thrust = 0
+
+    F_drag, F_weight = FD_W(v)            # calculate drag force and weight
+
+    if Vw > 0:
+        dh_dt = v                 # rate of change of height
+        dv_dt = (F_thrust - F_drag - F_weight) / (mb + mw)  # rate of change of velocity
+        dVw_dt = -Ae * v_e        # rate of change of water volume
+    else:
+        dh_dt = v
+        dv_dt = ( - F_drag - F_weight) / mb  # rate of change of velocity without thrust
+        dVw_dt = 0                 # no more water to expel
+    return dh_dt, dv_dt, dVw_dt
+
+#=========================================================================
+########           Équations différentielles separer            ##########
+#=========================================================================
+def equation_pos(V, Vw):
+
+    dh_dt = V
+    return dh_dt
+
+def equation_vel(v, Vw):
+
+    if Vw <= 0 and v <= 0:
+        return 0, 0, 0, 0  # Fin de la phase propulsive lorsque tout l'eau est expulsée
+    
+    p_in = internal_pressure(Vw)          # calculate the internal pressure
+    k = Vw / V                            # calculate the ratio of remaining water volume to total volume
+    v_e = water_exit_velocity(k, p_in)    # calculate the exit velocity of water
+
+    mw = rho_w * Vw                       # calculate the remaining water mass
+
+    if Vw > 0:
+        F_thrust = rho_w * Ae * v_e**2        # calculate the thrust force
+    else:
+        F_thrust = 0
+
+    F_drag, F_weight = FD_W(v)            # calculate drag force and weight
+
+    if Vw > 0:
+        dv_dt = (F_thrust - F_drag - F_weight) / (mb + mw)  # rate of change of velocity
+    else:
+        dv_dt = ( - F_drag - F_weight) / mb  # rate of change of velocity without thrust
+    
+    return dv_dt
+
+def equation_water_volume(v, Vw):
+    
+    p_in = internal_pressure(Vw)          # calculate the internal pressure
+    k = Vw / V                            # calculate the ratio of remaining water volume to total volume
+    v_e = water_exit_velocity(k, p_in)    # calculate the exit velocity of water
+
+    if Vw > 0:
+        dVw_dt = -Ae * v_e        # rate of change of water volume
+        return dVw_dt
+    else:
+        return 0
+    
 
 
 #=======================================================
@@ -160,8 +268,10 @@ Tfinal = 4 # lenght of the simulation
 stepsNbr = 20 # number of steps in the simulation
 
 # Initial conditions
-y0 = 0 # Initial pos
-t0 = 0 # Initial time
+t0 = 0.00001 # Initial time
+h0 = 0.00001 # Initial height
+v0 = 0 # Initial velocity
+Vw0 = 1
 
 # differential equation dy/dt = f(t, y)
 def f(t, y): 
@@ -169,42 +279,86 @@ def f(t, y):
 
     return dydt
 
-##### FUNCTION #####
-def RungeKutta(_y0, _t0, _stepsNbr, _Tfinal):
-    ts = [_t0] # Time list
-    ys = [_y0] # Solution list
-
-    deltaT = _Tfinal / _stepsNbr
-
-    for i in range(_stepsNbr):
-
-        m1 = f(ts[-1], ys[-1])
-        m2 = f(ts[-1] + deltaT / 2, ys[-1] + m1 * deltaT / 2)
-        m3 = f(ts[-1] + deltaT / 2, ys[-1] + m2 * deltaT / 2)
-        m4 = f(ts[-1] + deltaT, ys[-1] + m3 * deltaT)
-        m = (m1 + 2 * m2 + 2 * m3 + m4) / 6
-        
-        next_y = ys[-1] + m * deltaT
-
-        ts.append(ts[-1] + deltaT)
-        ys.append(next_y)
 
 
-        if abs(ys[-2] - ys[-1]) < 0.001 or ys[-1] <= 0 :  # stop when the value change is negligible
-            ys.pop(-1)
-            ts.pop(-1)
-            break
 
-    print("ronguekutta", ts)
-    print("ronguekutta", ys)
-    x_simple = ts ##[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    y_simple = ys ##[2, 4, 6, 8, 10, 8, 6, 4, 2, 0]
+
+
+
+
+def Rungekutta(t0, h0, v0, Vw0, stepNbr, Tfinal):
     
-    # Appel avec couleur bleue
-    ##graphique_temporel(x_simple, y_simple, 40, 40, 'bleu')
-    ##graphique_temporel(x_simple, y_simple, 20, 20, 'vert')
-    txtGraph(ts, ys)
-    return (ts, ys)
+    def systeme_complet(h, v, Vw):
+        """
+        Retourne [dh_dt, dv_dt, dVw_dt]
+        """
+        return [
+            equation_pos(v, Vw),           # dh/dt
+            equation_vel(v, Vw),           # dv/dt  
+            equation_water_volume(v, Vw)   # dVw/dt
+        ]
+    
+    ts = [t0]
+    hs = [h0]
+    vs = [v0]
+    Vws = [Vw0]
+
+    deltaT = Tfinal / stepNbr
+
+    for i in range(stepNbr):
+        t_current = ts[-1]
+        h_current = hs[-1]
+        v_current = vs[-1]
+        Vw_current = Vws[-1]
+
+        # POINT 1
+        k1 = systeme_complet(h_current, v_current, Vw_current)
+        
+        # POINT 2 (utiliser les composantes individuelles)
+        k2 = systeme_complet(
+            h_current + deltaT/2 * k1[0], 
+            v_current + deltaT/2 * k1[1], 
+            Vw_current + deltaT/2 * k1[2]
+        )
+        
+        # POINT 3
+        k3 = systeme_complet(
+            h_current + deltaT/2 * k2[0],
+            v_current + deltaT/2 * k2[1], 
+            Vw_current + deltaT/2 * k2[2]
+        )
+        
+        # POINT 4
+        k4 = systeme_complet(
+            h_current + deltaT * k3[0],
+            v_current + deltaT * k3[1],
+            Vw_current + deltaT * k3[2]
+        )
+
+        # MOYENNE PONDÉRÉE
+        m_h = (k1[0] + 2*k2[0] + 2*k3[0] + k4[0]) / 6
+        m_v = (k1[1] + 2*k2[1] + 2*k3[1] + k4[1]) / 6
+        m_Vw = (k1[2] + 2*k2[2] + 2*k3[2] + k4[2]) / 6
+
+        # MISE À JOUR
+        hs.append(h_current + deltaT * m_h)
+        vs.append(v_current + deltaT * m_v)
+        Vws.append(Vw_current + deltaT * m_Vw)
+        ts.append(t_current + deltaT)
+
+        # Conditions d'arrêt
+        if hs[-1] <= 0:  # Au sol
+            hs[-1] = 0
+            vs[-1] = 0
+            break
+            
+        if Vws[-1] <= 0:  # Plus d'eau
+            Vws[-1] = 0
+    txtGraph(ts, hs)
+    return ts, hs, vs, Vws
+
+
+
 
 #txtGraph()
-tsys = RungeKutta(y0, t0, stepsNbr, Tfinal)
+tsys = Rungekutta(t0, h0, v0, Vw0, stepsNbr, Tfinal)
