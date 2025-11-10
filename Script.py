@@ -362,3 +362,4 @@ def Rungekutta(t0, h0, v0, Vw0, stepNbr, Tfinal):
 
 #txtGraph()
 tsys = Rungekutta(t0, h0, v0, Vw0, stepsNbr, Tfinal)
+print(tsys[1])
