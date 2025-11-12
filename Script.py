@@ -350,4 +350,4 @@ def Rungekutta(t0, h0, v0, Vw0, stepNbr):
 
 tsys = Rungekutta(t0, h0, v0, Vw0, stepsNbr)
 #print(tsys[2])
-txtGraph(tsys[0], tsys[2], "Height.txt")
+txtGraph(tsys[0], tsys[1], "Height.txt")
