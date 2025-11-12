@@ -15,12 +15,12 @@ patm = 101325         # Pression atmosphérique (Pa)
 #les noms avec o sont des paramètres à t = 0s (on peut pas mettre 0 dans la variable donc o = initial, tandis que "in" comme dans p_ino est pour "intérieur" ou "interne")
 # les paramètres qu'on ne connait pas sont notés float pour l'instant
 D = float(0.1)               # Diamètre de la fusée (m)
-De = float(0.02)            # Diamètre de la buse (m)
+De = float(0.008)            # Diamètre de la buse (m)
 A = math.pi * (D / 2)**2     # Aire frontale du rocket (m²)
 Ae = math.pi * (De / 2)**2   # Aire de la buse (m²)
 V = float(0.0015)          # Volume total du rocket (m³)
 p_ino = float(500000)           # Pression initiale à l'intérieur (Pa)
-mb = float(0.2)             # Masse structurelle (kg)
+mb = float(0.1)             # Masse structurelle (kg)
 Vwo = float(0.0005)              # Volume d'eau initial dans la fusée
 mw = rho_w * Vwo
 k = Vwo /V
@@ -144,7 +144,9 @@ def water_exit_velocity(k, p_in):
     p_in : internal pressure
     """
     try:
-        v_e = math.sqrt((2 * (p_in - patm)) / (rho_w * (1 - (Ae / A)**4))) #calculate the exit velocity of water based on bernouilli's equation
+        #v_e = math.sqrt((2 * (p_in - patm)) / (rho_w * (1 - (Ae / A)**4))) #calculate the exit velocity of water based on bernouilli's equation
+        #v_e = math.sqrt((2 * (patm - p_in)) / (rho_w * ((Ae/A)**4 - 1))) #calculate the exit velocity of water based on bernouilli's equation
+        v_e=((2*(p_ino*((1-k0)/(1-k))**(gamma)-patm))/((rho_w)*(1-((Ae)/(A))**2)))**(1/2)
         return v_e
     except:
         return 0
@@ -201,6 +203,7 @@ def equation_vel(v, Vw):
                 p_in = internal_pressure(Vw)
                 v_e = water_exit_velocity(Vw/V, p_in)
                 F_thrust = rho_w * Ae * v_e**2
+                print(F_thrust)
             else:
                 F_thrust = 0
             
@@ -255,7 +258,7 @@ def txtGraph(xs: list, ys: list, FileName = "Output.txt"):
 ##### Simulation parameters #####
 
 
-stepsNbr = 3000 # number of steps in the simulation
+stepsNbr = 300 # number of steps in the simulation
 
 # Initial conditions
 t0 = 0.00001 # Initial time
@@ -301,7 +304,7 @@ def Rungekutta(t0, h0, v0, Vw0, stepNbr):
     ts = [t0]
     ys = [[h0, v0, Vw0]]  # Stocker toutes les variables dans une liste
     
-    deltaT = 0.1  # Pas de temps constant
+    deltaT = 0.01  # Pas de temps constant
     
     for i in range(stepNbr):
         t_current = ts[-1]
@@ -346,5 +349,5 @@ def Rungekutta(t0, h0, v0, Vw0, stepNbr):
 
 
 tsys = Rungekutta(t0, h0, v0, Vw0, stepsNbr)
-print(tsys[1])
-txtGraph(tsys[0], tsys[1], "Height.txt")
+#print(tsys[2])
+txtGraph(tsys[0], tsys[2], "Height.txt")

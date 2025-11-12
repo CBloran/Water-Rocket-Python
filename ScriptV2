@@ -15,11 +15,11 @@ patm = 101325         # Pression atmosphérique (Pa)
 #les noms avec o sont des paramètres à t = 0s (on peut pas mettre 0 dans la variable donc o = initial, tandis que "in" comme dans p_ino est pour "intérieur" ou "interne")
 # les paramètres qu'on ne connait pas sont notés float pour l'instant
 D = float(0.1)               # Diamètre de la fusée (m)
-De = float(0.02)            # Diamètre de la buse (m)
+De = float(0.008)            # Diamètre de la buse (m)
 A = math.pi * (D / 2)**2     # Aire frontale du rocket (m²)
 Ae = math.pi * (De / 2)**2   # Aire de la buse (m²)
 V = float(0.0015)          # Volume total du rocket (m³)
-p_ino = float(400000)           # Pression initiale à l'intérieur (Pa)
+p_ino = float(500000)           # Pression initiale à l'intérieur (Pa)
 mb = float(0.2)             # Masse structurelle (kg)
 Vwo = float(0.0005)              # Volume d'eau initial dans la fusée
 mw = rho_w * Vwo
@@ -232,5 +232,5 @@ def Rungekutta(t0, h0, v0, Vw0, stepNbr):
 
 
 tsys = Rungekutta(t0, h0, v0, Vw0, stepsNbr)
-print(tsys[3])
-txtGraph(tsys[0], tsys[3], "Height.txt")
+print(tsys[1])
+txtGraph(tsys[0], tsys[1], "Height.txt")
