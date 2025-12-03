@@ -7,7 +7,7 @@ import math
 g = 9.81               # Accélération de la gravité (m/s²)
 rho_w = 1.0e3         # Densité de l'eau (kg/m³)
 rho_atm = 1.23        # Densité de l'air (kg/m³)
-Cd = 0.35             # Coefficient de traînée aérodynamique
+Cd = 0.85             # Coefficient de traînée aérodynamique
 gamma = 1.4           # Coefficient adiabatique de l'air
 patm = 101325         # Pression atmosphérique (Pa)
 
@@ -19,7 +19,7 @@ De = float(0.008)            # Diamètre de la buse (m)
 A = math.pi * (D / 2)**2     # Aire frontale du rocket (m²)
 Ae = math.pi * (De / 2)**2   # Aire de la buse (m²)
 V = float(0.0015)          # Volume total du rocket (m³)
-p_ino = float(500000)           # Pression initiale à l'intérieur (Pa)
+p_ino = float(300000)           # Pression initiale à l'intérieur (Pa)
 mb = float(0.1)             # Masse structurelle (kg)
 Vwo = float(0.0005)              # Volume d'eau initial dans la fusée
 mw = rho_w * Vwo
@@ -198,7 +198,7 @@ def equation_vel(v, Vw):
             
             mw_current = rho_w * Vw  # Masse d'eau actuelle
             F_drag, F_weight = FD_W(v, mw_current)  # Utiliser masse actuelle
-        
+            
             if Vw > 0:
                 p_in = internal_pressure(Vw)
                 v_e = water_exit_velocity(Vw/V, p_in)
