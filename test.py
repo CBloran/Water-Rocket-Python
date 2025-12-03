@@ -1,217 +1,383 @@
 import math
 
+# Constantes physiques
+patm = 101325  # Pression atmosphérique (Pa)
+p_ino = 300000  # Pression initiale (Pa)
+V = 0.001  # Volume total de la bouteille (m³)
+Vwo = 0.0005  # Volume d'eau initial (m³)
+rho_w = 1000  # Densité de l'eau (kg/m³)
+mb = 0.1  # Masse de la fusée vide (kg)
+Ae = 0.0001  # Aire de la section de sortie (m²)
+A = 0.001  # Aire de la section transversale (m²)
+gamma = 1.4  # Coefficient adiabatique pour l'air
+g = 9.81  # Accélération gravitationnelle (m/s²)
 
-# ============================================================
-# CONSTANTES PHYSIQUES RÉALISTES
-# ============================================================
+# Calcul des volumes initiaux
+Vao = V - Vwo  # Volume d'air initial
+k0 = Vwo / V  # Ratio eau/volume initial
 
-g = 9.81               # Gravité (m/s²)
-rho_w = 1000.0         # Densité eau (kg/m³)
-rho_air = 1.225        # Densité air (kg/m³)
-Cd = 0.35               # Coefficient traînée (fusée typique)
-patm = 101325          # Pression atmosphérique (Pa)
-
-# Paramètres FUSÉE RÉALISTE
-D_body = 0.1           # Diamètre fusée (m)
-A_cross = math.pi * (D_body/2)**2  # Section frontale
-D_nozzle = 0.02       # Diamètre buse (m) - PLUS PETIT
-A_nozzle = math.pi * (D_nozzle/2)**2
-
-V_total = 0.0015        # Volume total 2L
-V_water_initial = 0.0005 # Volume eau initial 1L
-V_air_initial = V_total - V_water_initial
-
-p0 = 500000           # Pression initiale 4 bars
-m_dry = 0.2          # Masse à vide 500g - PLUS LÉGER
-
-print("=== PARAMÈTRES FUSÉE ===")
-print(f"Volume eau: {V_water_initial*1000:.0f}mL")
-print(f"Volume air: {V_air_initial*1000:.0f}mL") 
-print(f"Pression: {p0/1000:.0f} kPa")
-print(f"Masse sèche: {m_dry:.1f}kg")
-print(f"Surface buse: {A_nozzle*10000:.1f} cm²")
-
-class WaterRocket:
-    def __init__(self):
-        self.g = g
-        self.rho_w = rho_w
-        self.rho_air = rho_air
-        self.Cd = Cd
-        self.patm = patm
-        self.A_cross = A_cross
-        self.A_nozzle = A_nozzle
-        self.V_total = V_total
-        self.V_water = V_water_initial
-        self.V_air = V_air_initial
-        self.pressure = p0
-        self.m_dry = m_dry
-        self.m_water = rho_w * V_water_initial
-        
-    def update(self, dt):
-        """Mise à jour physique sur un pas de temps dt"""
-        
-        # 1. ÉJECTION DE L'EAU (si il reste de l'eau et pression suffisante)
-        thrust = 0
-        if self.V_water > 0 and self.pressure > self.patm:
-            # Vitesse d'éjection (Bernoulli)
-            v_ejection = math.sqrt(2 * (self.pressure - self.patm) / self.rho_w)
-            
-            # Débit volumique
-            Q = self.A_nozzle * v_ejection
-            
-            # Masse d'eau éjectée
-            dm_water = self.rho_w * Q * dt
-            dm_water = min(dm_water, self.m_water)  # Ne pas éjecter plus que disponible
-            
-            if dm_water > 0:
-                # Mise à jour masse et volume eau
-                self.m_water -= dm_water
-                self.V_water = self.m_water / self.rho_w
-                
-                # Force de poussée (F = dm/dt * v)
-                thrust = (dm_water / dt) * v_ejection
-                
-                # Expansion adiabatique de l'air
-                self.V_air = self.V_total - self.V_water
-                if self.V_air > 0:
-                    # Loi adiabatique: P * V^γ = constante
-                    gamma = 1.4
-                    self.pressure = p0 * (V_air_initial / self.V_air) ** gamma
-                else:
-                    self.pressure = self.patm
-        
-        return thrust
+def FD_W(v, m_current=mb):
+    """
+    Calcule la traînée et le poids
+    v: vitesse
+    m_current: masse totale actuelle (kg)
+    """
+    # Coefficient de traînée simplifié
+    Cd = 0.5
+    rho_air = 1.225  # Densité de l'air (kg/m³)
     
-    def get_mass(self):
-        return self.m_dry + self.m_water
+    F_drag = 0.5 * Cd * rho_air * A * v**2
+    # La traînée s'oppose toujours au mouvement
+    if v != 0:
+        F_drag = -abs(F_drag) * (v/abs(v)) if v != 0 else 0
     
-    def get_drag(self, velocity):
-        """Force de traînée"""
-        if abs(velocity) < 0.1:
+    F_weight = m_current * g
+    return F_drag, F_weight
+
+def internal_pressure(Vw):
+    """
+    Vw : volume d'eau restant
+    Calcul de la pression interne en fonction du volume d'eau restant.
+    """
+    if Vw < 0:
+        Vw = 0
+    
+    Va = V - Vw  # volume d'air restant
+    Vao = V - Vwo  # volume d'air initial
+
+    if Va > 0 and Vao > 0:
+        p_in = p_ino * (Vao / Va)**gamma  # loi adiabatique
+        return max(p_in, patm)
+    else:
+        return patm
+
+def water_exit_velocity(k, p_in):
+    """
+    k : ratio of remaining water volume to total volume
+    p_in : internal pressure
+    """
+    try:
+        if p_in <= patm:
             return 0
-        return 0.5 * self.rho_air * velocity**2 * self.Cd * self.A_cross
+        
+        # Formule corrigée
+        denominator = rho_w * (1 - (Ae/A)**2)
+        if denominator <= 0:
+            return 0
+            
+        v_e = math.sqrt(2 * (p_in - patm) / rho_w)
+        return v_e
+    except:
+        return 0
 
-def simulate_rocket():
-    """Simulation complète de la trajectoire"""
-    
-    rocket = WaterRocket()
-    
+#=========================================================================
+########           Méthode de Runge-Kutta complète           ##########
+#=========================================================================
+
+def RungeKutta_complet(t0, h0, v0, Vw0, dt=0.001, max_time=10):
+    """
+    Intégration complète avec pas de temps fixe
+    """
     # Conditions initiales
-    t = 0
-    dt = 0.0001  # Pas de temps 10ms
-    y = 0.001    # Hauteur initiale (départ du sol)
-    v = 0.0    # Vitesse initiale
-    phase = "PROPULSION"
+    t = t0
+    h = h0
+    v = v0
+    Vw = Vw0
     
-    # Stockage résultats
-    times = [t]
-    heights = [y]
-    velocities = [v]
-    thrusts = [0]
-    masses = [rocket.get_mass()]
-    pressures = [rocket.pressure]
+    # Listes pour stocker les résultats
+    t_list = [t]
+    h_list = [h]
+    v_list = [v]
+    Vw_list = [Vw]
+    phase_list = [1]  # 1: propulsion, 2: balistique
     
-    max_height = 0
-    water_depleted_time = 0
+    # Boucle d'intégration
+    phase = 1  # Commence en phase de propulsion
+    i = 0
     
-    print("\n=== DÉBUT SIMULATION ===")
-    
-    while y > 0 or t < 1:  # Simuler jusqu'au sol ou minimum 1s
-        # Calcul forces
-        thrust = rocket.update(dt)
-        drag = rocket.get_drag(v)
-        weight = rocket.get_mass() * g
+    while t < max_time and h >= 0 and i < 10000:
+        i += 1
         
-        # Accélération (F = ma)
-        if rocket.get_mass() > 0.01:  # Éviter division par zéro
-            acceleration = (thrust - drag - weight) / rocket.get_mass()
+        # Déterminer la phase actuelle
+        if Vw <= 0 and phase == 1:
+            phase = 2  # Passage à la phase balistique
+            print(f"Transition à la phase balistique à t={t:.3f}s, h={h:.2f}m, v={v:.2f}m/s")
+        
+        # Masse actuelle
+        if phase == 1:
+            m = mb + rho_w * max(Vw, 0)
         else:
-            acceleration = -g  # Chute libre
-            
-        # Intégration vitesse et position
-        v += acceleration * dt
-        y += v * dt
+            m = mb
         
-        # Mise à jour temps
+        # Fonction du système d'équations
+        def system(t, y):
+            h_y, v_y, Vw_y = y
+            
+            # Calcul des forces
+            if phase == 1 and Vw_y > 0:
+                # Phase propulsion
+                p_in = internal_pressure(Vw_y)
+                k = Vw_y / V
+                v_e = water_exit_velocity(k, p_in)
+                F_thrust = rho_w * Ae * v_e**2 if v_e > 0 else 0
+                F_drag, F_weight = FD_W(v_y, m)
+                
+                # Équations différentielles
+                dh_dt = v_y
+                dv_dt = (F_thrust - F_drag - F_weight) / m
+                dVw_dt = -Ae * v_e if v_e > 0 else 0
+                
+            else:
+                # Phase balistique
+                F_drag, F_weight = FD_W(v_y, m)
+                
+                dh_dt = v_y
+                dv_dt = (-F_drag - F_weight) / m
+                dVw_dt = 0
+            
+            return [dh_dt, dv_dt, dVw_dt]
+        
+        # RK4
+        y = [h, v, Vw]
+        k1 = system(t, y)
+        
+        y_temp = [y[j] + 0.5*dt*k1[j] for j in range(3)]
+        k2 = system(t + 0.5*dt, y_temp)
+        
+        y_temp = [y[j] + 0.5*dt*k2[j] for j in range(3)]
+        k3 = system(t + 0.5*dt, y_temp)
+        
+        y_temp = [y[j] + dt*k3[j] for j in range(3)]
+        k4 = system(t + dt, y_temp)
+        
+        # Mise à jour
+        for j in range(3):
+            y[j] += dt/6 * (k1[j] + 2*k2[j] + 2*k3[j] + k4[j])
+        
+        # Mettre à jour les variables
         t += dt
+        h = max(y[0], 0)  # Éviter les hauteurs négatives
+        v = y[1]
+        Vw = max(y[2], 0)  # Éviter les volumes négatifs
         
-        # Détection fin eau
-        if rocket.V_water <= 0.000001 and water_depleted_time == 0:
-            water_depleted_time = t
-            phase = "BALLISTIQUE"
-            print(f"→ Phase balistique à t={t:.2f}s, h={y:.1f}m, v={v:.1f}m/s")
+        # Stocker les résultats
+        t_list.append(t)
+        h_list.append(h)
+        v_list.append(v)
+        Vw_list.append(Vw)
+        phase_list.append(phase)
         
-        # Stockage données
-        times.append(t)
-        heights.append(max(y, 0))
-        velocities.append(v)
-        thrusts.append(thrust)
-        masses.append(rocket.get_mass())
-        pressures.append(rocket.pressure)
-        
-        max_height = max(max_height, y)
-        
-        # Arrêt si au sol depuis un moment
-        if y <= 0 and t > 2:
+        # Conditions d'arrêt
+        if h <= 0 and v < 0:
+            print(f"Atterrissage à t={t:.3f}s")
             break
-            
-        # Sécurité durée
-        if t > 30:
-            break
+        
+        if abs(v) < 0.01 and h > 0 and phase == 2:
+            # Apogée approximative
+            print(f"Apogée approximative à t={t:.3f}s, h={h:.2f}m")
     
-    # Analyse résultats
-    print("\n=== RÉSULTATS ===")
-    print(f"Temps simulation: {t:.2f}s")
-    print(f"Hauteur maximale: {max_height:.1f}m")
-    print(f"Vitesse maximale: {max([abs(v) for v in velocities]):.1f}m/s")
-    print(f"Poussée max: {max(thrusts):.1f}N")
-    print(f"Temps propulsion: {water_depleted_time:.2f}s")
-    
-    if max_height < 5:
-        print("\n⚠️  HAUTEUR TROP FAIBLE - VÉRIFIER PARAMÈTRES")
-        print("Suggestions:")
-        print("- Augmenter pression initiale")
-        print("- Réduire masse sèche")
-        print("- Augmenter volume eau")
-        print("- Agrandir diamètre buse")
-    
-    return times, heights, velocities, thrusts, masses, pressures
+    return t_list, h_list, v_list, Vw_list, phase_list
 
-def create_ascii_trajectory(times, heights):
-    """Crée une visualisation ASCII de la trajectoire"""
-    if not heights:
+# Version alternative avec pas de volume adaptatif
+def RungeKutta_volumeAdaptatif(t0, h0, v0, Vw0, max_steps=1000):
+    """
+    Version qui s'adapte au débit d'eau
+    """
+    # Conditions initiales
+    t = t0
+    h = h0
+    v = v0
+    Vw = Vw0
+    
+    t_list = [t]
+    h_list = [h]
+    v_list = [v]
+    Vw_list = [Vw]
+    
+    phase = 1
+    i = 0
+    
+    while i < max_steps and h >= 0:
+        i += 1
+        
+        # Déterminer le pas de temps adaptatif
+        if phase == 1 and Vw > 0:
+            # En phase propulsion, adapter le pas au débit
+            p_in = internal_pressure(Vw)
+            k = Vw / V
+            v_e = water_exit_velocity(k, p_in)
+            
+            if v_e > 0:
+                # Pas basé sur le temps pour vider un petit volume
+                dVw_target = Vwo / 1000  # Vider 0.1% du volume initial par pas
+                dt = dVw_target / (Ae * v_e)
+                dt = min(dt, 0.01)  # Limiter à 10ms max
+            else:
+                dt = 0.001
+        else:
+            # Phase balistique : pas fixe
+            dt = 0.01
+            phase = 2
+        
+        # Masse actuelle
+        m = mb + rho_w * max(Vw, 0) if phase == 1 else mb
+        
+        # RK4
+        def deriv(t, y):
+            h_y, v_y, Vw_y = y
+            
+            if phase == 1 and Vw_y > 0:
+                # Propulsion
+                p_in = internal_pressure(Vw_y)
+                k = Vw_y / V
+                v_e = water_exit_velocity(k, p_in)
+                F_thrust = rho_w * Ae * v_e**2 if v_e > 0 else 0
+                F_drag, F_weight = FD_W(v_y, m)
+                
+                return [v_y, 
+                       (F_thrust - F_drag - F_weight) / m,
+                       -Ae * v_e if v_e > 0 else 0]
+            else:
+                # Balistique
+                F_drag, F_weight = FD_W(v_y, m)
+                return [v_y, (-F_drag - F_weight) / m, 0]
+        
+        y = [h, v, Vw]
+        k1 = deriv(t, y)
+        k2 = deriv(t + dt/2, [y[j] + dt/2*k1[j] for j in range(3)])
+        k3 = deriv(t + dt/2, [y[j] + dt/2*k2[j] for j in range(3)])
+        k4 = deriv(t + dt, [y[j] + dt*k3[j] for j in range(3)])
+        
+        # Mise à jour
+        for j in range(3):
+            y[j] += dt/6 * (k1[j] + 2*k2[j] + 2*k3[j] + k4[j])
+        
+        t += dt
+        h = max(y[0], 0)
+        v = y[1]
+        Vw = max(y[2], 0)
+        
+        # Stockage
+        t_list.append(t)
+        h_list.append(h)
+        v_list.append(v)
+        Vw_list.append(Vw)
+        
+        # Transition de phase
+        if phase == 1 and Vw <= 0:
+            phase = 2
+            print(f"Fin de l'eau à t={t:.3f}s")
+        
+        # Arrêt conditions
+        if h <= 0 and v <= 0:
+            break
+    
+    return t_list, h_list, v_list, Vw_list
+
+#=========================================================================
+########           Fonctions d'affichage           ##########
+#=========================================================================
+
+def txtGraph(xs: list, ys: list, FileName="Output.txt"):
+    """
+    Crée une représentation graphique textuelle
+    """
+    if not xs or not ys:
+        print(f"Erreur: listes vides pour {FileName}")
         return
     
-    max_h = max(heights)
-    scale_h = 50.0 / max_h if max_h > 0 else 1
-    scale_t = len(times) / 50  # Échantillonnage temporel
-    
-    print(f"\n📈 TRAJECTOIRE (max: {max_h:.1f}m)")
-    print("=" * 60)
-    
-    for i in range(0, len(times), max(1, int(scale_t))):
-        if i < len(heights) and heights[i] >= 0:
-            h_display = heights[i] * scale_h
-            bar = "█" * int(h_display)
-            print(f"t={times[i]:5.2f}s | h={heights[i]:5.1f}m {bar}")
+    with open(FileName, "w") as source_file:
+        # Normalisation pour l'affichage
+        if len(xs) != len(ys):
+            min_len = min(len(xs), len(ys))
+            xs = xs[:min_len]
+            ys = ys[:min_len]
+        
+        # Créer une échelle verticale
+        max_y = max(ys)
+        min_y = min(ys)
+        range_y = max_y - min_y
+        
+        if range_y > 0:
+            scale = 50 / range_y  # 50 caractères de hauteur
+        else:
+            scale = 1
+        
+        for i in range(len(ys)):
+            # Position verticale normalisée
+            pos = int((ys[i] - min_y) * scale)
+            line = " " * pos + "|" + f" t={xs[i]:.2f}s, y={ys[i]:.2f}m"
+            source_file.write(line + "\n")
+        
+        # Informations résumées
+        source_file.write("\n" + "="*60 + "\n")
+        source_file.write(f"Durée: {xs[-1]:.2f} s | Hauteur max: {max(ys):.2f} m | Points: {len(xs)}\n")
 
-# ============================================================
-# EXÉCUTION
-# ============================================================
+def afficher_resultats(t_list, h_list, v_list, Vw_list):
+    """
+    Affiche un résumé des résultats
+    """
+    if not t_list:
+        print("Aucun résultat à afficher")
+        return
+    
+    print("\n" + "="*60)
+    print("RÉSULTATS DE LA SIMULATION")
+    print("="*60)
+    print(f"Durée totale: {t_list[-1]:.3f} s")
+    print(f"Hauteur maximale: {max(h_list):.3f} m")
+    print(f"Vitesse maximale: {max(v_list):.3f} m/s")
+    print(f"Vitesse à l'apogée: {v_list[h_list.index(max(h_list))]:.3f} m/s")
+    print(f"Volume d'eau initial: {Vwo*1e6:.1f} ml")
+    print(f"Temps de propulsion: {next((t for t, Vw in zip(t_list, Vw_list) if Vw <= 0), t_list[-1]):.3f} s")
+    print(f"Nombre de points: {len(t_list)}")
+    print("="*60)
+    
+    # Sauvegarde complète
+    with open("simulation_complete.csv", "w") as f:
+        f.write("t(s),h(m),v(m/s),Vw(m3)\n")
+        for i in range(len(t_list)):
+            f.write(f"{t_list[i]:.4f},{h_list[i]:.4f},{v_list[i]:.4f},{Vw_list[i]:.6f}\n")
+
+#=========================================================================
+########           Exécution principale           ##########
+#=========================================================================
 
 if __name__ == "__main__":
-    print("SIMULATION FUSÉE À EAU")
-    print("Modèle physique réaliste avec propulsion par éjection d'eau")
+    print("Simulation de fusée à eau")
+    print("="*50)
     
-    times, heights, velocities, thrusts, masses, pressures = simulate_rocket()
+    # Méthode 1: Pas de temps fixe (plus stable)
+    print("\nMéthode 1: Pas de temps fixe")
+    t1, h1, v1, Vw1, phase1 = RungeKutta_complet(
+        t0=0.0,
+        h0=0.0,
+        v0=0.0,
+        Vw0=Vwo,
+        dt=0.001,
+        max_time=5
+    )
     
-    create_ascii_trajectory(times, heights)
+    afficher_resultats(t1, h1, v1, Vw1)
+    txtGraph(t1, h1, "hauteur_fixe.txt")
+    txtGraph(t1, v1, "vitesse_fixe.txt")
     
-    # Sauvegarde données
-    with open("rocket_trajectory.txt", "w") as f:
-        f.write("t(s)\th(m)\tv(m/s)\tF(N)\tm(kg)\tp(Pa)\n")
-        for i in range(len(times)):
-            f.write(f"{times[i]:.3f}\t{heights[i]:.3f}\t{velocities[i]:.3f}\t")
-            f.write(f"{thrusts[i]:.1f}\t{masses[i]:.3f}\t{pressures[i]:.0f}\n")
+    # Méthode 2: Pas adaptatif
+    print("\nMéthode 2: Pas adaptatif")
+    t2, h2, v2, Vw2 = RungeKutta_volumeAdaptatif(
+        t0=0.0,
+        h0=0.0,
+        v0=0.0,
+        Vw0=Vwo,
+        max_steps=2000
+    )
     
-    print(f"\n💾 Données sauvegardées dans 'rocket_trajectory.txt'")
+    afficher_resultats(t2, h2, v2, Vw2)
+    txtGraph(t2, h2, "hauteur_adaptatif.txt")
+    txtGraph(t2, v2, "vitesse_adaptatif.txt")
+    
+    print("\nSimulations terminées!")
+    print("Fichiers générés:")
+    print("- hauteur_fixe.txt, vitesse_fixe.txt")
+    print("- hauteur_adaptatif.txt, vitesse_adaptatif.txt")
+    print("- simulation_complete.csv")
