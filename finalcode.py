@@ -63,8 +63,6 @@ def water_exit_velocity(k, p_in):
     p_in : internal pressure
     """
     try:
-        #v_e = math.sqrt((2 * (p_in - patm)) / (rho_w * (1 - (Ae / A)**4))) #calculate the exit velocity of water based on bernouilli's equation
-        #v_e = math.sqrt((2 * (patm - p_in)) / (rho_w * ((Ae/A)**4 - 1))) #calculate the exit velocity of water based on bernouilli's equation
         v_e=((2*(p_ino*((1-k0)/(1-k))**(gamma)-patm))/((rho_w)*(1-((Ae)/(A))**2)))**(1/2) #calculate the exit velocity of water based on bernouilli's equation
         return v_e
     except:
@@ -130,15 +128,18 @@ def txtGraph(xs: list, ys: list, FileName = "Output.txt"):
 ##### Simulation parameters #####
 
 
-stepsNbr = 300 # number of steps in the simulation
 
-# Initial conditions
-t0 = 0.00001 # Initial time
-h0 = 0.00001 # Initial height
-v0 = 0 # Initial velocity
-Vw0 = 0.0005
 
 def Rungekutta(t0, h0, v0, Vw0, stepNbr):
+
+
+    stepsNbr = 500 # number of steps in the simulation
+
+    # Initial conditions
+    t0 = 0.00001 # Initial time
+    h0 = 0.00001 # Initial height
+    v0 = 0 # Initial velocity
+    Vw0 = 0.0005
     
     def systeme_complet(t, y):
         """
