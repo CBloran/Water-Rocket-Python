@@ -20,7 +20,7 @@ De = float(0.008)            # Diamètre de la buse (m)
 A = math.pi * (D / 2)**2     # Aire frontale du rocket (m²)
 Ae = math.pi * (De / 2)**2   # Aire de la buse (m²)
 V = float(0.0015)          # Volume total du rocket (m³)
-p_ino = float(500000)           # Pression initiale à l'intérieur (Pa)
+p_ino = float(300000)           # Pression initiale à l'intérieur (Pa)
 p_ino += 101325             # Convertir la pression relative en pression absolue
 mb = float(0.1)             # Masse structurelle (kg)
 Vwo = float(0.0005)              # Volume d'eau initial dans la fusée
@@ -130,10 +130,10 @@ def txtGraph(xs: list, ys: list, FileName = "Output.txt"):
 
 
 
-def Rungekutta(t0, h0, v0, Vw0, stepNbr):
+def Rungekutta():
 
 
-    stepsNbr = 500 # number of steps in the simulation
+    stepNbr = 500 # number of steps in the simulation
 
     # Initial conditions
     t0 = 0.00001 # Initial time
@@ -213,6 +213,6 @@ def Rungekutta(t0, h0, v0, Vw0, stepNbr):
 
 
 
-tsys = Rungekutta(t0, h0, v0, Vw0, stepsNbr)
+tsys = Rungekutta()
 #print(tsys[2])
 txtGraph(tsys[0], tsys[1], "Height.txt")
