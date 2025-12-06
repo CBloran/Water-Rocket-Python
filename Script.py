@@ -203,10 +203,10 @@ def equation_vel(v, Vw):
                 p_in = internal_pressure(Vw)
                 v_e = water_exit_velocity(Vw/V, p_in)
                 F_thrust = rho_w * Ae * v_e**2
-                print(F_thrust)
+                
             else:
                 F_thrust = 0
-            
+            print(F_thrust)
             if Vw > 0:
                 dv_dt = (F_thrust - F_drag - F_weight) / (mb + mw_current)
             else:
