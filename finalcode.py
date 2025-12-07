@@ -30,18 +30,30 @@ k0 = Vwo/V
 
 
 # ============================================================
-# (4) FORCES DE TRAÎNÉE ET DE GRAVITÉ
+#  FORCES EN PRESENCE
 # ============================================================
-def FD_W(v, mw1 = mw):
+def Weight(mw):
     """
-    v : la vitesse de la fusée
-    Équations (4) :
-    F_D = 1/2 * rho_atm * v² * Cd * A   -> force de traînée
-    W   = (mb + mw) * g                 -> poids total du rocket
+    mw : water mass
+    Calculate the weight of the rocket
+    """
+    
+    W = (mb + mw) * g
+    return W
+def Drag(v):
+    """
+    v : Rocket speed
+    Calcculate the drag force
     """
     FD = 0.5 * rho_atm * v**2 * Cd * A
-    W = (mb + mw1) * g
-    return FD, W
+    return FD
+def Thrust(v_e):
+    """
+    v_e : exit velocity of water
+    calculate the thrust force based on the exit velocity of water
+    """
+    F_thrust = rho_w * Ae * v_e**2
+    return F_thrust
 # ============================================================
 def internal_pressure(Vw):
     """
@@ -63,21 +75,21 @@ def water_exit_velocity(k, p_in):
     p_in : internal pressure
     """
     try:
-        v_e=((2*(p_ino*((1-k0)/(1-k))**(gamma)-patm))/((rho_w)*(1-((Ae)/(A))**2)))**(1/2) #calculate the exit velocity of water based on bernouilli's equation
+        v_e = ((2*(p_ino*((1-k0)/(1-k))**(gamma)-patm))/((rho_w)*(1-((Ae)/(A))**2)))**(1/2) #calculate the exit velocity of water based on bernouilli's equation
         return v_e
     except:
         return 0
-    
 
 def equation_vel(v, Vw):
             
             mw_current = rho_w * Vw  # Masse d'eau actuelle
-            F_drag, F_weight = FD_W(v, mw_current)  # Utiliser masse actuelle
+            F_drag = Drag(v)
+            F_weight = Weight(mw_current)  
             
             if Vw > 0:
                 p_in = internal_pressure(Vw)
                 v_e = water_exit_velocity(Vw/V, p_in)
-                F_thrust = rho_w * Ae * v_e**2
+                F_thrust = Thrust(v_e)
                 #print(F_thrust)
             else:
                 F_thrust = 0
@@ -130,10 +142,10 @@ def txtGraph(xs: list, ys: list, FileName = "Output.txt"):
 
 
 
-def Rungekutta():
-
-
-    stepNbr = 500 # number of steps in the simulation
+def Rungekutta(stepNbr=3000):
+    """
+    stepNbr : number of points in the simulation
+    """
 
     # Initial conditions
     t0 = 0.00001 # Initial time
@@ -162,8 +174,6 @@ def Rungekutta():
         # Équation de vitesse
         dv_dt = equation_vel(v, Vw)
 
-        
-        
         return [dh_dt, dv_dt, dVw_dt]
     
     # Initialisation
@@ -213,6 +223,7 @@ def Rungekutta():
 
 
 
+tsys = Rungekutta()
 tsys = Rungekutta()
 #print(tsys[2])
 txtGraph(tsys[0], tsys[1], "Height.txt")
