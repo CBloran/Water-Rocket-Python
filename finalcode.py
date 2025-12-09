@@ -20,7 +20,7 @@ De = float(0.008)            # Diamètre de la buse (m)
 A = math.pi * (D / 2)**2     # Aire frontale du rocket (m²)
 Ae = math.pi * (De / 2)**2   # Aire de la buse (m²)
 V = float(0.0015)          # Volume total du rocket (m³)
-p_ino = float(300000)           # Pression initiale à l'intérieur (Pa)
+p_ino = float(200000)           # Pression initiale à l'intérieur (Pa)
 p_ino += 101325             # Convertir la pression relative en pression absolue
 mb = float(0.1)             # Masse structurelle (kg)
 Vwo = float(0.0005)              # Volume d'eau initial dans la fusée
@@ -181,8 +181,10 @@ def Rungekutta(stepNbr=3000):
     ys = [[h0, v0, Vw0]]  # Stocker toutes les variables dans une liste
     
     deltaT = 0.01  # Pas de temps constant
+    i = 0
     
-    for i in range(stepNbr):
+    while ys[-1][0] > 0 and i < stepNbr:
+        i += 1
         t_current = ts[-1]
         y_current = ys[-1]
         print(y_current[1])
@@ -190,27 +192,18 @@ def Rungekutta(stepNbr=3000):
         # RK4 standard
         k1 = systeme_complet(t_current, y_current)
         
-        k2 = systeme_complet(t_current + deltaT/2, 
-                           [y_current[j] + deltaT/2 * k1[j] for j in range(3)])
+        k2 = systeme_complet(t_current + deltaT/2, [y_current[j] + deltaT/2 * k1[j] for j in range(3)])
         
-        k3 = systeme_complet(t_current + deltaT/2,
-                           [y_current[j] + deltaT/2 * k2[j] for j in range(3)])
+        k3 = systeme_complet(t_current + deltaT/2, [y_current[j] + deltaT/2 * k2[j] for j in range(3)])
         
-        k4 = systeme_complet(t_current + deltaT,
-                           [y_current[j] + deltaT * k3[j] for j in range(3)])
-        
+        k4 = systeme_complet(t_current + deltaT, [y_current[j] + deltaT * k3[j] for j in range(3)])
         # Mise à jour
-        y_new = [y_current[j] + deltaT/6 * (k1[j] + 2*k2[j] + 2*k3[j] + k4[j]) 
-                for j in range(3)]
-        
-        # Conditions d'arrêt
-        if y_new[0] <= 0:  # Au sol
-            y_new[0] = 0
-            y_new[1] = 0
-        
+        y_new = [y_current[j] + deltaT/6 * (k1[j] + 2*k2[j] + 2*k3[j] + k4[j]) for j in range(3)]
             
         ts.append(t_current + deltaT)
         ys.append(y_new)
+    
+    ys.append([0, 0, 0])
     
     # Séparation des résultats
     hs = [y[0] for y in ys]
