@@ -8,7 +8,7 @@ import math
 g = 9.81               # Accélération de la gravité (m/s²)
 rho_w = 1.0e3         # Densité de l'eau (kg/m³)
 rho_atm = 1.23        # Densité de l'air (kg/m³)
-Cd = 0.35             # Coefficient de traînée aérodynamique
+Cd = 0.85             # Coefficient de traînée aérodynamique
 gamma = 1.4           # Coefficient adiabatique de l'air
 patm = 101325         # Pression atmosphérique (Pa)
 
@@ -21,7 +21,7 @@ A = math.pi * (D / 2)**2     # Aire frontale du rocket (m²)
 Ae = math.pi * (De / 2)**2   # Aire de la buse (m²)
 V = float(0.0015)          # Volume total du rocket (m³)
 p_ino = float(300000)           # Pression initiale à l'intérieur (Pa)
-#p_ino += 101325             # Convertir la pression relative en pression absolue
+#p_ino += 100000             # Convertir la pression relative en pression absolue
 mb = float(0.1)             # Masse structurelle (kg)
 Vwo = float(0.0005)              # Volume d'eau initial dans la fusée
 mw = rho_w * Vwo
@@ -67,7 +67,7 @@ def internal_pressure(Vw):
         p_in = p_ino * (Vao / Va)**gamma # calculate the remaining internal pressure based on adiabatic law
         return p_in
     else:
-        return patm 
+        return 0 
 
 def water_exit_velocity(k, p_in):
     """
@@ -75,7 +75,7 @@ def water_exit_velocity(k, p_in):
     p_in : internal pressure
     """
     try:
-        v_e = ((2*(p_ino*((1-k0)/(1-k))**(gamma)-patm))/((rho_w)*(1-((Ae)/(A))**2)))**(1/2) #calculate the exit velocity of water based on bernouilli's equation
+        v_e = ((2*(p_in*((1-k0)/(1-k))**(gamma)))/((rho_w)*(1-((Ae)/(A))**2)))**(1/2) #calculate the exit velocity of water based on bernouilli's equation
         return v_e
     except:
         return 0
@@ -155,8 +155,10 @@ def Rungekutta(stepNbr=3000):
     
     def systeme_complet(t, y):
         """
+        Params:
+        t = time
         y = [h, v, Vw]
-        Retourne [dh_dt, dv_dt, dVw_dt]
+        return [dh_dt, dv_dt, dVw_dt]
         """
         h, v, Vw = y
         
