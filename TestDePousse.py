@@ -1,6 +1,4 @@
-
 import math
-import turtle
 import matplotlib.pyplot as plt
 
 # ============================================================
@@ -10,250 +8,379 @@ import matplotlib.pyplot as plt
 g = 9.81               # Accélération de la gravité (m/s²)
 rho_w = 1.0e3         # Densité de l'eau (kg/m³)
 rho_atm = 1.23        # Densité de l'air (kg/m³)
-Cd = 0.85             # Coefficient de traînée aérodynamique
-gamma = 1.4           # Coefficient adiabatique de l'air
+Cd = 0.5              # Coefficient de traînée aérodynamique (réduit pour fusée lisse)
 patm = 101325         # Pression atmosphérique (Pa)
 
-# Paramètres géométriques et initiaux du rocket
-#les noms avec o sont des paramètres à t = 0s (on peut pas mettre 0 dans la variable donc o = initial, tandis que "in" comme dans p_ino est pour "intérieur" ou "interne")
-# les paramètres qu'on ne connait pas sont notés float pour l'instant
-D = float(0.1)               # Diamètre de la fusée (m)
-De = float(0.008)            # Diamètre de la buse (m)
-A = math.pi * (D / 2)**2     # Aire frontale du rocket (m²)
+# Paramètres géométriques et initiaux
+D = 0.1               # Diamètre de la fusée (m)
+De = 0.008            # Diamètre de la buse (m)
 Ae = math.pi * (De / 2)**2   # Aire de la buse (m²)
-V = float(0.0015)          # Volume total du rocket (m³)
-p_ino = float(300000)           # Pression initiale à l'intérieur (Pa)
-#p_ino += 100000             # Convertir la pression relative en pression absolue
-mb = float(0.1)             # Masse structurelle (kg)
-Vwo = float(0.0005)              # Volume d'eau initial dans la fusée
-mw = rho_w * Vwo
-k = Vwo /V
-k0 = Vwo/V
+A = math.pi * (D / 2)**2     # Aire frontale du rocket (m²)
+mb = 0.1              # Masse structurelle (kg)
+Vwo = 0.0005          # Volume d'eau initial (m³) = 500 mL
+rho_w = 1000          # Densité de l'eau (kg/m³)
+mw0 = rho_w * Vwo     # Masse d'eau initiale
 
+# ============================================================
+# DONNÉES EXPÉRIMENTALES DE POUSSÉE 
+# ============================================================
+
+poussee_mesuree = [
+    13.286, 15.31, 16.682, 16.975, 16.486, 13.482, 14.82, 16.616, 16.29,
+    14.559, 14.07, 13.384, 14.984, 14.723, 12.568, 12.274, 14.363, 15.408,
+    14.429, 15.408, 17.237, 15.604, 13.417, 13.417, 13.841, 10.968,
+    8.323, 8.225, 8.16, 6.429, 6.625, 6.397, 6.886, 5.809, 6.331,
+    5.613, 3.556, 4.111, 4.177, 2.936, 2.577, 2.773, 2.609,
+    0, 0, 0, 0, 0, 0, 0  
+]
+
+# moving average to get rid of the noise
+poussee_lissee = []
+for i in range(len(poussee_mesuree)):
+    if i == 0:
+        poussee_lissee.append(poussee_mesuree[i])
+    elif i == len(poussee_mesuree) - 1:
+        poussee_lissee.append(poussee_mesuree[i])
+    else:
+        # Moyenne sur 3 points
+        lisse = (poussee_mesuree[i-1] + poussee_mesuree[i] + poussee_mesuree[i+1]) / 3
+        poussee_lissee.append(lisse)
+
+# Use the new data
+poussee_mesuree = poussee_lissee
+
+# Calculate the total lenght of the experimental simulation
+duree_propulsion_mesuree = len(poussee_mesuree) * 0.01  # secondes
+
+print(f"Durée de propulsion: {duree_propulsion_mesuree:.2f} s")
+print(f"Poussée moyenne pendant propulsion: {sum(poussee_mesuree[:43])/43:.2f} N")
+print(f"Poussée maximale: {max(poussee_mesuree):.2f} N")
+
+
+# Calculate the total impulsion caused by the thrust
+impulsion_totale = sum([f * 0.01 for f in poussee_mesuree])
+print(f"Impulsion totale: {impulsion_totale:.2f} N·s")
+
+def get_thrust_from_measured_data(t):
+    """
+    Retourne la poussée mesurée au temps t.
+    Les données sont disponibles pour t < duree_propulsion_mesuree.
+    Pour t >= duree_propulsion_mesuree, retourne 0.
+    """
+    if t < 0:
+        return 0
+    
+    # calculate the index of the measure because wwe took 1 measure every 0.01 s
+    index = int(round(t / 0.01))
+    
+    if index < 0:
+        return poussee_mesuree[0]
+    elif index >= len(poussee_mesuree):
+        return 0
+    else:
+        return poussee_mesuree[index]
 
 # ============================================================
 #  FORCES EN PRESENCE
 # ============================================================
+
 def Weight(mw):
     """
-    mw : water mass
-    Calculate the weight of the rocket
+    mw : masse d'eau actuelle (kg)
+    Calcule le poids de la fusée
     """
-    
-    W = (mb + mw) * g
-    return W
+    return (mb + mw) * g
+
 def Drag(v):
     """
-    v : Rocket speed
-    Calcculate the drag force
+    v : vitesse du rocket (m/s)
+    Calcule la force de traînée
     """
-    FD = 0.5 * rho_atm * v**2 * Cd * A
-    return FD
-def Thrust(v_e):
-    """
-    v_e : exit velocity of water
-    calculate the thrust force based on the exit velocity of water
-    """
-    F_thrust = rho_w * Ae * v_e**2
-    return F_thrust
-# ============================================================
-def internal_pressure(Vw):
-    """
-    Vw : volume d'eau restant
-    Calcul de la pression interne en fonction du volume d'eau restant.
-    """
-    Va = V - Vw  # remaining air volume
-    Vao = V - Vwo  # initial air volume
-
-    if Va > 0:
-        p_in = p_ino * (Vao / Va)**gamma # calculate the remaining internal pressure based on adiabatic law
-        return p_in
+    # La traînée est proportionnelle au carré de la vitesse
+    if v > 0:
+        return 0.5 * rho_atm * v**2 * Cd * A
     else:
-        return 0 
+        return -0.5 * rho_atm * v**2 * Cd * A  # Pour la descente
 
-def water_exit_velocity(k, p_in):
+def equation_vel(v, mw, t):
     """
-    k : ratio of remaining water volume to total volume
-    p_in : internal pressure
+    Équation de vitesse utilisant les données mesurées de poussée
     """
-    try:
-        v_e = ((2*(p_in*((1-k0)/(1-k))**(gamma)))/((rho_w)*(1-((Ae)/(A))**2)))**(1/2) #calculate the exit velocity of water based on bernouilli's equation
-        return v_e
-    except:
+    # Masse totale actuelle
+    masse_totale = mb + mw
+    
+    # Forces en présence
+    F_thrust = get_thrust_from_measured_data(t)
+    F_drag = Drag(v)
+    F_weight = Weight(mw)
+    
+    # Accélération (F = ma)
+    if masse_totale > 0:
+        dv_dt = (F_thrust - F_drag - F_weight) / masse_totale
+    else:
+        dv_dt = 0
+    
+    return dv_dt
+
+def estimate_water_consumption_rate(t):
+    """
+    Estimate the water consumption rate based on the thrust data.
+    Using this equation: F = ṁ * v_e où v_e ~ sqrt(2*ΔP/ρ)
+    """
+    F_thrust = get_thrust_from_measured_data(t)
+    
+    if F_thrust <= 0:
         return 0
-
-def equation_vel(v, Vw):
-            
-            mw_current = rho_w * Vw  # Masse d'eau actuelle
-            F_drag = Drag(v)
-            F_weight = Weight(mw_current)  
-            
-            if Vw > 0:
-                p_in = internal_pressure(Vw)
-                v_e = water_exit_velocity(Vw/V, p_in)
-                F_thrust = Thrust(v_e)
-                #print(F_thrust)
-            else:
-                F_thrust = 0
-            
-            if Vw > 0:
-                dv_dt = (F_thrust - F_drag - F_weight) / (mb + mw_current)
-            else:
-                dv_dt = (-F_drag - F_weight) / mb
-            return dv_dt
-
-def equation_water_volume(v, Vw):
-
-    k = Vw / V                            # calculate the ratio of remaining water 
-    p_in = internal_pressure(Vw)
-    v_e = water_exit_velocity(k, p_in)
-    dVw_dt = -Ae * v_e        # rate of change of water volume
-    return dVw_dt
-
-#=======================================================
-########           Graphique txt             ##########
-#=======================================================
-
-# fonction d'affichage des de liste de données suivant l'axe vertical parce que c est plus facil et que ca marche tout aussi bien
-
-
-def txtGraph(xs: list, ys: list, FileName = "Output.txt"):
-    source_file = open(FileName, "w")
-    x_simple = xs[:] ##[1, 2.1, 3.6, 4.4, 5.5, 6, 7, 8, 9, 10]  test data
-    y_simple = ys[:] ##[2.1, 4, 6, 8, 10, 8.5, 6.6, 4.8, 2.8, 0] test data
-
-    for i in range(len(x_simple)):       # only keep the rounded value of our data because we cant use decimal number to set the position of the text
-        x_simple[i] = round(x_simple[i])
-        y_simple[i] = round(y_simple[i])
-
-    max_x = max(x_simple)                
-    max_y = max(y_simple)                # find the max value of the list to adjust the pos of the text    
     
-
-    for i in range(len(y_simple)):
-        line = (y_simple[i] - 1) * " " + str(round(ys[i], 1)) + (max_y - y_simple[i]) * " "
-        source_file.write(line + "\n")
-
-#=======================================================
-########           Graph V2 MathPlot             #########
-#=======================================================
-def graphMathPlot(Times, dataIn, additionalValues):
     
-
-    # Exemple de données
-    data = dataIn
-
-    # Séparation des composantes
-    h  = [row[0] for row in data]
-    v  = [row[1] for row in data]
-    Vw = [row[2] for row in data]
+    v_e_estimated = 300  # m/s - standard value
     
+    
+    m_dot = v_e_estimated * Ae
+    
+    # Volumic comsuption (kg/s -> m³/s)
+    #V_dot = m_dot / rho_w
+    
+    return -m_dot 
 
-    x = Times  # axe X (index / temps / itérations)
+# ============================================================
+# MÉTHODE DE RUNGE-KUTTA 4ÈME ORDRE
+# ============================================================
 
-    plt.figure(figsize=(10, 5))
+def RungeKutta_water_rocket(max_time=10.0, dt=0.01):
+    """
+    Simulation complète de la fusée à eau avec données mesurées
+    """
+    # Conditions initiales
+    t = 0.0
+    h = 0.0      # hauteur initiale
+    v = 0.0      # vitesse initiale
+    mw = mw0     # masse d'eau initiale
+    
+    # Listes pour stocker les résultats
+    times = [t]
+    heights = [h]
+    velocities = [v]
+    water_masses = [mw]
+    thrusts = [get_thrust_from_measured_data(t)]
+    accelerations = [0]
 
-    plt.plot(x, h,  label="h",  color="red",   marker="o", markersize = 2)
-    plt.plot(x, v,  label="v",  color="blue",  marker="o", markersize = 2)
-    plt.plot(x, Vw, label="Vw", color="green", marker="o", markersize = 2)
-    if additionalValues:
-        plt.plot(x, additionalValues, label="F_thrust", color="orange", marker="o", markersize = 2)
 
-    plt.xlabel("Index")
-    plt.ylabel("Valeur")
-    plt.title("Évolution de h, v et Vw")
-    plt.legend()
-    plt.grid(True)
+    def systeme_complet(t, y):
+        h, v, mw = y
+        dh_dt = v
+        dv_dt = equation_vel(v, mw, t)
+        dm_dt = estimate_water_consumption_rate(t)
+        return [dh_dt, dv_dt, dm_dt]
+    
+    # Simulation
+    while t < max_time and h >= -0.1:  # S'arrêter si on touche le sol
+        # Stocker les valeurs actuelles
+        current_thrust = get_thrust_from_measured_data(t)
+        
+        # État actuel
+        y = [h, v, mw]
+        
 
+        
+
+
+
+
+        k1 = systeme_complet(t, y)
+        
+        k2 = systeme_complet(t + dt/2, [y[j] + dt/2 * k1[j] for j in range(3)])
+        
+        k3 = systeme_complet(t + dt/2, [y[j] + dt/2 * k2[j] for j in range(3)])
+        
+        k4 = systeme_complet(t + dt, [y[j] + dt * k3[j] for j in range(3)])
+        # Mise à jour
+        y_new = [y[j] + dt/6 * (k1[j] + 2*k2[j] + 2*k3[j] + k4[j]) for j in range(3)]
+            
+        t += dt
+
+        h_new = y_new[0]
+        v_new = y_new[1]
+        mw_new = y_new[2]
+
+
+        
+        # Stocker les nouvelles valeurs
+        times.append(t)
+        heights.append(h_new)
+        velocities.append(v_new)
+        water_masses.append(mw_new)
+        thrusts.append(get_thrust_from_measured_data(t))
+        
+        # Mettre à jour pour l'itération suivante
+        h, v, mw = h_new, v_new, mw_new
+        
+        # Arrêter si la fusée redescend et a déjà atteint une hauteur significative
+        if t > 5 and v < -5 and h < max(heights)/10:
+            break
+    
+    return times, heights, velocities, water_masses, thrusts
+
+# ============================================================
+# VISUALISATION
+# ============================================================
+
+def plot_results(times, heights, velocities, water_masses, thrusts):
+    """
+    Crée des graphiques complets des résultats
+    """
+    fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+    
+    # Hauteur vs temps
+    axes[0, 0].plot(times, heights, 'b-', linewidth=2)
+    axes[0, 0].set_xlabel('Temps (s)')
+    axes[0, 0].set_ylabel('Hauteur (m)')
+    axes[0, 0].set_title('Trajectoire de la fusée')
+    axes[0, 0].grid(True)
+    axes[0, 0].axhline(y=0, color='k', linestyle='-', alpha=0.3)
+    
+    # Marquer l'apogée
+    max_h = max(heights)
+    max_h_time = times[heights.index(max_h)]
+    axes[0, 0].plot(max_h_time, max_h, 'ro', markersize=10)
+    axes[0, 0].annotate(f'Apogée: {max_h:.1f} m', 
+                       xy=(max_h_time, max_h),
+                       xytext=(max_h_time + 0.5, max_h),
+                       arrowprops=dict(arrowstyle='->'))
+    
+    # Vitesse vs temps
+    axes[0, 1].plot(times, velocities, 'r-', linewidth=2)
+    axes[0, 1].set_xlabel('Temps (s)')
+    axes[0, 1].set_ylabel('Vitesse (m/s)')
+    axes[0, 1].set_title('Vitesse de la fusée')
+    axes[0, 1].grid(True)
+    axes[0, 1].axhline(y=0, color='k', linestyle='-', alpha=0.3)
+    
+    # Marquer la vitesse maximale
+    max_v = max(velocities)
+    max_v_time = times[velocities.index(max_v)]
+    axes[0, 1].plot(max_v_time, max_v, 'ro', markersize=10)
+    axes[0, 1].annotate(f'Vmax: {max_v:.1f} m/s', 
+                       xy=(max_v_time, max_v),
+                       xytext=(max_v_time + 0.5, max_v),
+                       arrowprops=dict(arrowstyle='->'))
+    
+    # Poussée vs temps
+    axes[0, 2].plot(times[:len(thrusts)], thrusts, 'g-', linewidth=2)
+    axes[0, 2].set_xlabel('Temps (s)')
+    axes[0, 2].set_ylabel('Poussée (N)')
+    axes[0, 2].set_title('Profil de poussée mesuré')
+    axes[0, 2].grid(True)
+    axes[0, 2].axhline(y=0, color='k', linestyle='-', alpha=0.3)
+    
+    # Masse d'eau vs temps
+    water_volumes = [m/rho_w * 1000 for m in water_masses]  # Conversion en mL
+    axes[1, 0].plot(times, water_volumes, 'purple', linewidth=2)
+    axes[1, 0].set_xlabel('Temps (s)')
+    axes[1, 0].set_ylabel('Volume d\'eau (mL)')
+    axes[1, 0].set_title('Consommation d\'eau')
+    axes[1, 0].grid(True)
+    axes[1, 0].set_ylim(bottom=0)
+    
+    # Accélération vs temps (dérivée de la vitesse)
+    accelerations = []
+    for i in range(1, len(velocities)):
+        acc = (velocities[i] - velocities[i-1]) / (times[i] - times[i-1])
+        accelerations.append(acc)
+    
+    # Ajuster la longueur
+    acc_times = times[1:]
+    if len(acc_times) > len(accelerations):
+        acc_times = acc_times[:len(accelerations)]
+    
+    axes[1, 1].plot(acc_times, accelerations, 'orange', linewidth=2)
+    axes[1, 1].set_xlabel('Temps (s)')
+    axes[1, 1].set_ylabel('Accélération (m/s²)')
+    axes[1, 1].set_title('Accélération de la fusée')
+    axes[1, 1].grid(True)
+    axes[1, 1].axhline(y=0, color='k', linestyle='-', alpha=0.3)
+    axes[1, 1].axhline(y=-g, color='r', linestyle='--', alpha=0.5, label='-g')
+    axes[1, 1].legend()
+    
+    # Diagramme phase (vitesse vs hauteur)
+    axes[1, 2].plot(heights, velocities, 'b-', linewidth=2)
+    axes[1, 2].set_xlabel('Hauteur (m)')
+    axes[1, 2].set_ylabel('Vitesse (m/s)')
+    axes[1, 2].set_title('Diagramme de phase')
+    axes[1, 2].grid(True)
+    axes[1, 2].axhline(y=0, color='k', linestyle='-', alpha=0.3)
+    axes[1, 2].axvline(x=0, color='k', linestyle='-', alpha=0.3)
+    
+    # Marquer le début et la fin
+    axes[1, 2].plot(heights[0], velocities[0], 'go', markersize=10, label='Départ')
+    axes[1, 2].plot(heights[-1], velocities[-1], 'ro', markersize=10, label='Atterrissage')
+    axes[1, 2].plot(max_h, 0, 'ko', markersize=8, label='Apogée')
+    axes[1, 2].legend()
+    
     plt.tight_layout()
     plt.show()
-
-
-
-#=======================================================
-########           Runguert-Kutta             ##########
-#=======================================================
-##### Simulation parameters #####
-
-
-
-
-def Rungekutta(stepNbr=3000):
-    """
-    stepNbr : number of points in the simulation
-    """
-
-    # Initial conditions
-    t0 = 0.00001 # Initial time
-    h0 = 0.00001 # Initial height
-    v0 = 0 # Initial velocity
-    Vw0 = 0.0005
     
-    def systeme_complet(t, y):
-        """
-        Params:
-        t = time
-        y = [h, v, Vw]
-        return [dh_dt, dv_dt, dVw_dt]
-        """
-        h, v, Vw = y
-        
-        # Équation de position
-        dh_dt = v
-        
-        # Équation de volume d'eau
-        if Vw > 0.0000000001:  # Éviter les valeurs négatives
-            dVw_dt = equation_water_volume(v, Vw)
-            
-        else:
-            dVw_dt = 0
-            Vw = 0
-        
-        # Équation de vitesse
-        dv_dt = equation_vel(v, Vw)
+    return max_h, max_v, max_h_time
 
-        return [dh_dt, dv_dt, dVw_dt]
-    
-    # Initialisation
-    ts = [t0]
-    Fs = [0]
-    ys = [[h0, v0, Vw0]]  # Stocker toutes les variables dans une liste
-    
-    deltaT = 0.01  # Pas de temps constant
-    i = 0
-    
-    while ys[-1][0] > 0 and i < stepNbr:
-        i += 1
-        t_current = ts[-1]
-        y_current = ys[-1]
-        print(y_current[2])
-        
-        p_in = internal_pressure(y_current[2])
-        v_e = water_exit_velocity(y_current[2]/V, p_in)
-        F_thrust = Thrust(v_e)
-        Fs.append(p_in)
+# ============================================================
+# SIMULATION PRINCIPALE
+# ============================================================
 
-        # RK4 standard
-        k1 = systeme_complet(t_current, y_current)
-        
-        k2 = systeme_complet(t_current + deltaT/2, [y_current[j] + deltaT/2 * k1[j] for j in range(3)])
-        
-        k3 = systeme_complet(t_current + deltaT/2, [y_current[j] + deltaT/2 * k2[j] for j in range(3)])
-        
-        k4 = systeme_complet(t_current + deltaT, [y_current[j] + deltaT * k3[j] for j in range(3)])
-        # Mise à jour
-        y_new = [y_current[j] + deltaT/6 * (k1[j] + 2*k2[j] + 2*k3[j] + k4[j]) for j in range(3)]
-            
-        ts.append(t_current + deltaT)
-        ys.append(y_new)
+if __name__ == "__main__":
+    print("=" * 60)
+    print("SIMULATION DE FUSÉE À EAU AVEC POUSSÉE MESURÉE")
+    print("=" * 60)
     
-    graphMathPlot(ts, ys, Fs)
-    # Séparation des résultats
-    hs = [y[0] for y in ys]
-    vs = [y[1] for y in ys]
-    Vws = [y[2] for y in ys]
+    # Paramètres de la simulation
+    masse_totale_initiale = mb + mw0
+    print(f"\nParamètres initiaux:")
+    print(f"- Masse structure: {mb:.3f} kg")
+    print(f"- Masse d'eau initiale: {mw0:.3f} kg")
+    print(f"- Masse totale initiale: {masse_totale_initiale:.3f} kg")
+    print(f"- Volume d'eau: {Vwo*1000:.0f} mL")
+    print(f"- Poussée moyenne: {sum(poussee_mesuree)/len(poussee_mesuree):.2f} N")
     
-    return ts, hs, vs, Vws
-
-
-tsys = Rungekutta()
+    # Ratio poussée/poids initial
+    F_moyenne = sum(poussee_mesuree[:30])/30  # Moyenne sur les 0.3 premières secondes
+    ratio_poussee_poids = F_moyenne / (masse_totale_initiale * g)
+    print(f"- Ratio poussée/poids initial: {ratio_poussee_poids:.2f}")
+    
+    # Lancer la simulation
+    print("\nLancement de la simulation...")
+    times, heights, velocities, water_masses, thrusts = RungeKutta_water_rocket(max_time=15.0, dt=0.01)
+    
+    # Analyser les résultats
+    max_h, max_v, max_h_time = plot_results(times, heights, velocities, water_masses, thrusts)
+    
+    # Afficher les résultats
+    print("\n" + "=" * 60)
+    print("RÉSULTATS DE LA SIMULATION")
+    print("=" * 60)
+    print(f"Apogée atteinte: {max_h:.2f} m")
+    print(f"Vitesse maximale: {max_v:.2f} m/s ({max_v*3.6:.1f} km/h)")
+    print(f"Temps à l'apogée: {max_h_time:.2f} s")
+    print(f"Durée totale de vol: {times[-1]:.2f} s")
+    
+    # Temps de propulsion effectif (poussée > 0)
+    temps_propulsion = sum([1 for f in thrusts if f > 1]) * 0.01
+    print(f"Temps de propulsion effectif: {temps_propulsion:.2f} s")
+    
+    # Calculer la vitesse moyenne pendant la propulsion
+    v_propulsion = []
+    for i, t in enumerate(times):
+        if i < len(thrusts) and thrusts[i] > 1:
+            v_propulsion.append(velocities[i])
+    
+    if v_propulsion:
+        v_moy_propulsion = sum(v_propulsion) / len(v_propulsion)
+        print(f"Vitesse moyenne pendant propulsion: {v_moy_propulsion:.2f} m/s")
+    
+    # Énergie et performances
+    vitesse_atterrissage = abs(velocities[-1])
+    print(f"Vitesse à l'atterrissage: {vitesse_atterrissage:.2f} m/s")
+    
+    # Temps caractéristiques
+    print(f"\nTemps caractéristiques:")
+    for i, (t, h, v) in enumerate(zip(times, heights, velocities)):
+        if i % int(len(times)/10) == 0 and i > 0:
+            print(f"  t={t:.1f}s: h={h:.1f}m, v={v:.1f}m/s")

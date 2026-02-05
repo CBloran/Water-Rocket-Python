@@ -23,7 +23,7 @@ De = float(0.008)            # Diamètre de la buse (m)
 A = math.pi * (D / 2)**2     # Aire frontale du rocket (m²)
 Ae = math.pi * (De / 2)**2   # Aire de la buse (m²)
 V = float(0.0015)          # Volume total du rocket (m³)
-p_ino = float(500000)           # Pression initiale à l'intérieur (Pa)
+p_ino = float(360000)           # Pression initiale à l'intérieur (Pa)
 T_initial = 293.15  # 20°C
 #p_ino += 100000             # Convertir la pression relative en pression absolue
 mb = float(0.1)             # Masse structurelle (kg)
@@ -102,7 +102,7 @@ def equation_vel(v, Vw, p_in):
                 dv_dt = (F_thrust - F_drag - F_weight) / (mb + mw_current)
             else:
                 dv_dt = (-F_drag - F_weight) / mb
-            return dv_dt
+            return dv_dt, F_thrust
             
 def equation_vel_air(v, Vw, p_in):
             
@@ -122,7 +122,7 @@ def equation_vel_air(v, Vw, p_in):
             
             dv_dt = (0 - F_drag - F_weight) / mb
             
-            return dv_dt
+            return dv_dt, F_thrust
 
 def equation_water_volume(v, Vw):
 
@@ -162,24 +162,37 @@ def txtGraph(xs: list, ys: list, FileName = "Output.txt"):
 def graphMathPlot(Times, dataIn, additionalValues=None):
     
 
-    # Exemple de données
     data = dataIn
 
-    # Séparation des composantes
-    h  = [row[0] for row in data]
-    v  = [row[1] for row in data]
-    Vw = [row[2]*1000 for row in data]
-    p_in = [row[3]/1000 for row in data]
-    
-
-    x = Times  # axe X (index / temps / itérations)
+    x = Times 
 
     plt.figure(figsize=(10, 5))
 
+    # Séparation des composantes
+    h  = [row[0] for row in data]
     plt.plot(x, h,  label="h",  color="red",   marker="o", markersize = 2)
-    plt.plot(x, v,  label="v",  color="blue",  marker="o", markersize = 2)
-    plt.plot(x, Vw, label="Vw", color="green", marker="o", markersize = 2)
-    plt.plot(x, p_in, label="p_in", color="purple", marker="o", markersize = 2)
+
+    if len(data[0]) > 1:
+        v  = [row[1] for row in data]
+        plt.plot(x, v,  label="v",  color="blue",  marker="o", markersize = 2)
+
+    if len(data[0]) > 2:
+        Vw = [row[2]*1000 for row in data]
+        plt.plot(x, Vw, label="Vw", color="green", marker="o", markersize = 2)
+
+    if len(data[0]) > 3:
+        p_in = [row[3]/1000 for row in data]
+        plt.plot(x, p_in, label="p_in", color="purple", marker="o", markersize = 2)
+    
+    if len(data[0]) > 4:
+        F = [row[4] for row in data]
+        plt.plot(x, F, label="F", color="orange", marker="o", markersize = 2)
+    
+
+    
+    
+    
+    
     if additionalValues:
         plt.plot(x, additionalValues, label="F_thrust", color="orange", marker="o", markersize = 2)
 
@@ -202,7 +215,7 @@ def graphMathPlot(Times, dataIn, additionalValues=None):
 
 
 
-def Rungekutta(stepNbr=3000):
+def Rungekutta(stepNbr=5000):
     """
     stepNbr : number of points in the simulation
     """
@@ -217,10 +230,10 @@ def Rungekutta(stepNbr=3000):
         """
         Params:
         t = time
-        y = [h, v, Vw]
-        return [dh_dt, dv_dt, dVw_dt]
+        y = [h, v, Vw, p_in, F]
+        return [dh_dt, dv_dt, dVw_dt, dp_in_dt, F]
         """
-        h, v, Vw, p_in = y
+        h, v, Vw, p_in, F = y
         
         # Équation de position
         dh_dt = v
@@ -237,7 +250,7 @@ def Rungekutta(stepNbr=3000):
         if Vw > 0.0000000001:
             p_in_next = internal_pressure(Vw)
             dp_in_dt = (p_in_next - p_in) / deltaT
-            dv_dt = equation_vel(v, Vw, p_in)
+            dv_dt, F = equation_vel(v, Vw, p_in)
             
         else:
             dh_dt = v
@@ -247,16 +260,17 @@ def Rungekutta(stepNbr=3000):
                  dp_in_dt = 0
                  p_in = patm
             
-            dv_dt = equation_vel_air(v, Vw, p_in)
-        return [dh_dt, dv_dt, dVw_dt, dp_in_dt]
+            dv_dt, F = equation_vel_air(v, Vw, p_in)
+
+        return [dh_dt, dv_dt, dVw_dt, dp_in_dt, F]
     
     
     # Initialisation
     ts = [t0]
     Fs = [0]
-    ys = [[h0, v0, Vw0, p_ino]]  # Stocker toutes les variables dans une liste
+    ys = [[h0, v0, Vw0, p_ino, 0]]  # Stocker toutes les variables dans une liste
     
-    deltaT = 0.01  # Pas de temps constant
+    deltaT = 0.001  # Pas de temps constant
     i = 0
     
     while ys[-1][0] > 0 and i < stepNbr :
@@ -273,13 +287,14 @@ def Rungekutta(stepNbr=3000):
         # RK4 standard
         k1 = systeme_complet(t_current, y_current)
         
-        k2 = systeme_complet(t_current + deltaT/2, [y_current[j] + deltaT/2 * k1[j] for j in range(4)])
+        k2 = systeme_complet(t_current + deltaT/2, [y_current[j] + deltaT/2 * k1[j] for j in range(4)]+[y_current[4]])
         
-        k3 = systeme_complet(t_current + deltaT/2, [y_current[j] + deltaT/2 * k2[j] for j in range(4)])
+        k3 = systeme_complet(t_current + deltaT/2, [y_current[j] + deltaT/2 * k2[j] for j in range(4)]+[y_current[4]])
         
-        k4 = systeme_complet(t_current + deltaT, [y_current[j] + deltaT * k3[j] for j in range(4)])
+        k4 = systeme_complet(t_current + deltaT, [y_current[j] + deltaT * k3[j] for j in range(4)]+[y_current[4]])
+        
         # Mise à jour
-        y_new = [y_current[j] + deltaT/6 * (k1[j] + 2*k2[j] + 2*k3[j] + k4[j]) for j in range(4)]
+        y_new = [y_current[j] + deltaT/6 * (k1[j] + 2*k2[j] + 2*k3[j] + k4[j]) for j in range(4)]+[k1[4]]
             
         ts.append(t_current + deltaT)
         ys.append(y_new)
@@ -302,4 +317,4 @@ def Rungekutta(stepNbr=3000):
 tsys = Rungekutta()
 
 #print(tsys[2])
-#txtGraph(tsys[0], tsys[1], "Height.txt")
+txtGraph(tsys[0], tsys[1], "Height.txt")
