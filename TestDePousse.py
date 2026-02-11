@@ -133,10 +133,10 @@ def estimate_water_consumption_rate(t):
         return 0
     
     
-    v_e_estimated = 300  # m/s - standard value
+    v_e_estimated = 30  # m/s - standard value
     
     
-    m_dot = v_e_estimated * Ae
+    m_dot = F_thrust / v_e_estimated
     
     # Volumic comsuption (kg/s -> m³/s)
     #V_dot = m_dot / rho_w
@@ -201,7 +201,7 @@ def RungeKutta_water_rocket(max_time=10.0, dt=0.01):
 
         h_new = y_new[0]
         v_new = y_new[1]
-        mw_new = y_new[2]
+        mw_new = max(0, mw-0.01)#y_new[2]
 
 
         
@@ -274,10 +274,10 @@ def plot_results(times, heights, velocities, water_masses, thrusts):
     axes[0, 2].axhline(y=0, color='k', linestyle='-', alpha=0.3)
     
     # Masse d'eau vs temps
-    water_volumes = [m/rho_w * 1000 for m in water_masses]  # Conversion en mL
-    axes[1, 0].plot(times, water_volumes, 'purple', linewidth=2)
+    
+    axes[1, 0].plot(times, water_masses, 'purple', linewidth=2)
     axes[1, 0].set_xlabel('Temps (s)')
-    axes[1, 0].set_ylabel('Volume d\'eau (mL)')
+    axes[1, 0].set_ylabel('Masse d\'eau (KG)')
     axes[1, 0].set_title('Consommation d\'eau')
     axes[1, 0].grid(True)
     axes[1, 0].set_ylim(bottom=0)

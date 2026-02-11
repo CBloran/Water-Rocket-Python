@@ -270,7 +270,7 @@ def Rungekutta(stepNbr=5000):
     Fs = [0]
     ys = [[h0, v0, Vw0, p_ino, 0]]  # Stocker toutes les variables dans une liste
     
-    deltaT = 0.001  # Pas de temps constant
+    deltaT = 0.01  # Pas de temps constant
     i = 0
     
     while ys[-1][0] > 0 and i < stepNbr :
@@ -307,7 +307,8 @@ def Rungekutta(stepNbr=5000):
     hs = [y[0] for y in ys]
     vs = [y[1] for y in ys]
     Vws = [y[2] for y in ys]
-    
+    Fs = [y[4] for y in ys]
+    print(Fs)
     return ts, hs, vs, Vws
 
 
