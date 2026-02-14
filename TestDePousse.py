@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 g = 9.81               # Accélération de la gravité (m/s²)
 rho_w = 1.0e3         # Densité de l'eau (kg/m³)
 rho_atm = 1.23        # Densité de l'air (kg/m³)
-Cd = 0.5              # Coefficient de traînée aérodynamique (réduit pour fusée lisse)
+Cd = 0.85              # Coefficient de traînée aérodynamique (réduit pour fusée lisse)
 patm = 101325         # Pression atmosphérique (Pa)
 
 # Paramètres géométriques et initiaux
@@ -115,10 +115,10 @@ def equation_vel(v, mw, t):
     F_weight = Weight(mw)
     
     # Accélération (F = ma)
-    if masse_totale > 0:
-        dv_dt = (F_thrust - F_drag - F_weight) / masse_totale
+    if masse_totale > mb:  # Tant que de l'eau est présente
+        dv_dt = (F_thrust - F_drag) / masse_totale
     else:
-        dv_dt = 0
+        dv_dt = -F_weight / mb  # Si toute l'eau est consommée, on considère que la masse est celle de la structure seulement
     
     return dv_dt
 
