@@ -63,9 +63,9 @@ print(f"Impulsion totale: {impulsion_totale:.2f} N·s")
 
 def get_thrust_from_measured_data(t, mw):
     """
-    Retourne la poussée mesurée au temps t.
-    Les données sont disponibles pour t < duree_propulsion_mesuree.
-    Pour t >= duree_propulsion_mesuree, retourne 0.
+    Returns the thrust measured at time t from the measured_thrust data table, which contains a list of resultant forces.
+    Data is available for t < measured_thrust_duration.
+    For t >= measured_thrust_duration, returns 0.
     """
     if t < 0:
         return 0
@@ -79,7 +79,7 @@ def get_thrust_from_measured_data(t, mw):
     elif index >= len(poussee_mesuree) or poussee_mesuree[index] <= 0.01:
         return 0
     else:
-        return poussee_mesuree[index] + F_weight
+        return poussee_mesuree[index] + F_weight # we need to add the gravity force because the force data is the result of all the force on the bottle during the test so the gravity included
 
 # ============================================================
 #  FORCES EN PRESENCE
