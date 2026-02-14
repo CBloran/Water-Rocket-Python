@@ -90,6 +90,7 @@ def Weight(mw):
     mw : masse d'eau actuelle (kg)
     Calcule le poids de la fusée
     """
+    print(mb + mw)
     return (mb + mw) * g
 
 def Drag(v):

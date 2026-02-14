@@ -66,6 +66,7 @@ def FD_W(v, mw1 = mw):
     """
     FD = 0.5 * rho_atm * v**2 * Cd * A
     W = (mb + mw1) * g
+    print(mb + mw1)
     return FD, W
 
 
