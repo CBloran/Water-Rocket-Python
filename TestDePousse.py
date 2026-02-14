@@ -31,8 +31,8 @@ poussee_mesuree = [
     14.429, 15.408, 17.237, 15.604, 13.417, 13.417, 13.841, 10.968,
     8.323, 8.225, 8.16, 6.429, 6.625, 6.397, 6.886, 5.809, 6.331,
     5.613, 3.556, 4.111, 4.177, 2.936, 2.577, 2.773, 2.609,
-    0, 0, 0, 0, 0, 0, 0  
-]
+    0, 0, 0
+    ]
 
 # moving average to get rid of the noise
 poussee_lissee = []
@@ -61,7 +61,7 @@ print(f"Poussée maximale: {max(poussee_mesuree):.2f} N")
 impulsion_totale = sum([f * 0.01 for f in poussee_mesuree])
 print(f"Impulsion totale: {impulsion_totale:.2f} N·s")
 
-def get_thrust_from_measured_data(t):
+def get_thrust_from_measured_data(t, mw):
     """
     Retourne la poussée mesurée au temps t.
     Les données sont disponibles pour t < duree_propulsion_mesuree.
@@ -69,16 +69,17 @@ def get_thrust_from_measured_data(t):
     """
     if t < 0:
         return 0
-    
+    F_weight = Weight(mw)
+
     # calculate the index of the measure because wwe took 1 measure every 0.01 s
     index = int(round(t / 0.01))
     
     if index < 0:
-        return poussee_mesuree[0]
-    elif index >= len(poussee_mesuree):
+        return poussee_mesuree[0] + F_weight
+    elif index >= len(poussee_mesuree) or poussee_mesuree[index] <= 0.01:
         return 0
     else:
-        return poussee_mesuree[index]
+        return poussee_mesuree[index] + F_weight
 
 # ============================================================
 #  FORCES EN PRESENCE
@@ -110,33 +111,34 @@ def equation_vel(v, mw, t):
     masse_totale = mb + mw
     
     # Forces en présence
-    F_thrust = get_thrust_from_measured_data(t)
+    F_Thrust = get_thrust_from_measured_data(t, mw)
     F_drag = Drag(v)
     F_weight = Weight(mw)
     
     # Accélération (F = ma)
     if masse_totale > mb:  # Tant que de l'eau est présente
-        dv_dt = (F_thrust - F_drag) / masse_totale
+        dv_dt = (F_Thrust - F_drag - F_weight) / masse_totale
     else:
         dv_dt = -F_weight / mb  # Si toute l'eau est consommée, on considère que la masse est celle de la structure seulement
     
     return dv_dt
 
-def estimate_water_consumption_rate(t):
+def estimate_water_consumption_rate(t, mw):
     """
     Estimate the water consumption rate based on the thrust data.
     Using this equation: F = ṁ * v_e où v_e ~ sqrt(2*ΔP/ρ)
     """
-    F_thrust = get_thrust_from_measured_data(t)
     
-    if F_thrust <= 0:
+    F_Thrust = get_thrust_from_measured_data(t, mw)  # On considère que la poussée doit compenser le poids pour estimer la consommation
+    
+    if F_Thrust <= 0:
         return 0
     
     
     v_e_estimated = 30  # m/s - standard value
     
     
-    m_dot = F_thrust / v_e_estimated
+    m_dot = F_Thrust / v_e_estimated
     
     # Volumic comsuption (kg/s -> m³/s)
     #V_dot = m_dot / rho_w
@@ -162,7 +164,7 @@ def RungeKutta_water_rocket(max_time=10.0, dt=0.01):
     heights = [h]
     velocities = [v]
     water_masses = [mw]
-    thrusts = [get_thrust_from_measured_data(t)]
+    thrusts = [get_thrust_from_measured_data(t, mw)]
     accelerations = [0]
 
 
@@ -170,13 +172,13 @@ def RungeKutta_water_rocket(max_time=10.0, dt=0.01):
         h, v, mw = y
         dh_dt = v
         dv_dt = equation_vel(v, mw, t)
-        dm_dt = estimate_water_consumption_rate(t)
+        dm_dt = estimate_water_consumption_rate(t, mw)
         return [dh_dt, dv_dt, dm_dt]
     
     # Simulation
     while t < max_time and h >= -0.1:  # S'arrêter si on touche le sol
         # Stocker les valeurs actuelles
-        current_thrust = get_thrust_from_measured_data(t)
+        current_thrust = get_thrust_from_measured_data(t, mw)
         
         # État actuel
         y = [h, v, mw]
@@ -210,7 +212,7 @@ def RungeKutta_water_rocket(max_time=10.0, dt=0.01):
         heights.append(h_new)
         velocities.append(v_new)
         water_masses.append(mw_new)
-        thrusts.append(get_thrust_from_measured_data(t))
+        thrusts.append(get_thrust_from_measured_data(t, mw_new))
         
         # Mettre à jour pour l'itération suivante
         h, v, mw = h_new, v_new, mw_new
