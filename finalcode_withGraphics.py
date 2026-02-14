@@ -102,7 +102,7 @@ def equation_vel(v, Vw, p_in):
                 dv_dt = (F_thrust - F_drag - F_weight) / (mb + mw_current)
             else:
                 dv_dt = (-F_drag - F_weight) / mb
-            return dv_dt, F_thrust
+            return dv_dt, (F_thrust)
             
 def equation_vel_air(v, Vw, p_in):
             
@@ -115,8 +115,8 @@ def equation_vel_air(v, Vw, p_in):
                 
                 # Vitesse d'éjection
                 v_e = math.sqrt(2 * gamma / (gamma - 1) * R_air * T_air * (1 - (1 / pressure_ratio) ** ((gamma - 1) / gamma)))
-                F_thrust = Ae * v_e**2
-                print(F_thrust)
+                F_thrust = Ae * v_e**2 
+                
             else:
                 F_thrust = 0
             
