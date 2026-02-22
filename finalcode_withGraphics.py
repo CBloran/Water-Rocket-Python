@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 g = 9.81               # Accélération de la gravité (m/s²)
 rho_w = 1.0e3         # Densité de l'eau (kg/m³)
 rho_atm = 1.23        # Densité de l'air (kg/m³)
-Cd = 0.85             # Coefficient de traînée aérodynamique
+Cd = 0.73             # Coefficient de traînée aérodynamique
 gamma = 1.4           # Coefficient adiabatique de l'air
 patm = 101325         # Pression atmosphérique (Pa)
 R_air = 287.05
@@ -26,7 +26,7 @@ V = float(0.0015)          # Volume total du rocket (m³)
 p_ino = float(360000)           # Pression initiale à l'intérieur (Pa)
 T_initial = 293.15  # 20°C
 #p_ino += 100000             # Convertir la pression relative en pression absolue
-mb = float(0.1)             # Masse structurelle (kg)
+mb = float(0.3)             # Masse structurelle (kg)
 Vwo = float(0.0005)              # Volume d'eau initial dans la fusée
 mw = rho_w * Vwo
 k = Vwo /V
@@ -79,7 +79,11 @@ def water_exit_velocity(k, p_in):
     p_in : internal pressure
     """
     try:
-        v_e = ((2*(p_in*((1-k0)/(1-k))**(gamma)))/((rho_w)*(1-((Ae)/(A))**2)))**(1/2) #calculate the exit velocity of water based on bernouilli's equation
+        v_e = ((2*(p_ino*((1-k0)/(1-k))**(gamma))-patm)/((rho_w)*(1-((Ae)/(A))**2)))**(1/2) #calculate the exit velocity of water based on bernouilli's equation
+        #  OTHER BERNOUILLI EQUATION  #
+        #delta_P = p_in - patm
+        #v_e = (2.0 * delta_P / (rho_w*(1-(Ae/A)**2)))**(1/2) #calculate the exit velocity of water based on bernouilli's equation
+        
         return v_e
     except:
         return 0
