@@ -320,15 +320,15 @@ def Rungekutta(_Vw0, _p_ino, stepNbr=5000):
     Vws = [y[2] for y in ys]
     Fs = [y[4] for y in ys]
     #print(Fs)
-    return ts, hs, vs, Vws
+    return ts, ys
 
 
 def RungekuttaMax(x, y):
-    result = Rungekutta(x, y)
-    return max(result[1])
+    result = Rungekutta(x, y)[1]
+    hs = [y[0] for y in result]
+    return max(hs)
 
 
-#tsys = Rungekutta(0.0007, 500000)
 
 #print(tsys[2])
 #txtGraph(tsys[0], tsys[1], "Height.txt")
@@ -382,4 +382,20 @@ def graphique_3d_parametres(fonction, x_min, x_max, y_min, y_max, nb_points_x=50
     plt.show()
     
     return fig, ax
-graphique_3d_parametres(RungekuttaMax, 0.0001, 0.0010, 100000, 500000)
+#graphique_3d_parametres(RungekuttaMax, 0.0001, 0.0010, 100000, 500000)
+
+if __name__ == "__main__":
+    print("Veuillez choisir le mode d'execution :")
+    print("1. Mode Volume d'eau constant")
+    print("2. Mode graphique 3D")
+    choice = int(input())
+    if choice == 1:
+        print("Veuillez entrer le volume d'eau (en L) :")
+        Vw0 = float(input())/1000
+        print("Veuillez entrer la pression d'entrée (en Pa) :")
+        p_ino = float(input())
+        tsys = Rungekutta(Vw0, p_ino)
+        print("Hauteur maximale atteinte : ", max(tsys[1]))
+        graphMathPlot(tsys[0], tsys[1])
+    elif choice == 2:
+        graphique_3d_parametres(RungekuttaMax, 0.0001, 0.0010, 100000, 500000)
