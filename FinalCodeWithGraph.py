@@ -2,6 +2,8 @@
 import math
 import turtle
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import numpy as np
 
 # ============================================================
 # CONSTANTES PHYSIQUES ET PARAMÈTRES DU ROCKET À EAU
@@ -10,7 +12,7 @@ import matplotlib.pyplot as plt
 g = 9.81               # Accélération de la gravité (m/s²)
 rho_w = 1.0e3         # Densité de l'eau (kg/m³)
 rho_atm = 1.23        # Densité de l'air (kg/m³)
-Cd = 0.73             # Coefficient de traînée aérodynamique
+Cd = 0.831             # Coefficient de traînée aérodynamique
 gamma = 1.4           # Coefficient adiabatique de l'air
 patm = 101325         # Pression atmosphérique (Pa)
 R_air = 287.05
@@ -23,14 +25,12 @@ De = float(0.008)            # Diamètre de la buse (m)
 A = math.pi * (D / 2)**2     # Aire frontale du rocket (m²)
 Ae = math.pi * (De / 2)**2   # Aire de la buse (m²)
 V = float(0.0015)          # Volume total du rocket (m³)
-p_ino = float(360000)           # Pression initiale à l'intérieur (Pa)
+#p_ino = float(500000)           # Pression initiale à l'intérieur (Pa)
 T_initial = 293.15  # 20°C
 #p_ino += 100000             # Convertir la pression relative en pression absolue
 mb = float(0.3)             # Masse structurelle (kg)
-Vwo = float(0.0005)              # Volume d'eau initial dans la fusée
-mw = rho_w * Vwo
-k = Vwo /V
-k0 = Vwo/V
+#Vw0 = float(0.0009)              # Volume d'eau initial dans la fusée
+
 
 
 # ============================================================
@@ -59,27 +59,27 @@ def Thrust(v_e):
     F_thrust = rho_w * Ae * v_e**2
     return F_thrust
 # ============================================================
-def internal_pressure(Vw):
+def internal_pressure(_p_ino, Vw, Vw0):
     """
     Vw : volume d'eau restant
     Calcul de la pression interne en fonction du volume d'eau restant.
     """
     Va = V - Vw  # remaining air volume
-    Vao = V - Vwo  # initial air volume
+    Vao = V - Vw0  # initial air volume
 
     if Va > 0:
-        p_in = p_ino * (Vao / Va)**gamma # calculate the remaining internal pressure based on adiabatic law
+        p_in = _p_ino * (Vao / Va)**gamma # calculate the remaining internal pressure based on adiabatic law
         return p_in
     else:
         return 0 
 
-def water_exit_velocity(k, p_in):
+def water_exit_velocity(k, k0, _p_ino):
     """
     k : ratio of remaining water volume to total volume
     p_in : internal pressure
     """
     try:
-        v_e = ((2*(p_ino*((1-k0)/(1-k))**(gamma))-patm)/((rho_w)*(1-((Ae)/(A))**2)))**(1/2) #calculate the exit velocity of water based on bernouilli's equation
+        v_e = ((2*(_p_ino*((1-k0)/(1-k))**(gamma))-patm)/((rho_w)*(1-((Ae)/(A))**2)))**(1/2) #calculate the exit velocity of water based on bernouilli's equation
         #  OTHER BERNOUILLI EQUATION  #
         #delta_P = p_in - patm
         #v_e = (2.0 * delta_P / (rho_w*(1-(Ae/A)**2)))**(1/2) #calculate the exit velocity of water based on bernouilli's equation
@@ -88,15 +88,16 @@ def water_exit_velocity(k, p_in):
     except:
         return 0
 
-def equation_vel(v, Vw, p_in):
+def equation_vel(v, Vw, Vw0, _p_ino):
             
             mw_current = rho_w * Vw  # Masse d'eau actuelle
             F_drag = Drag(v)
             F_weight = Weight(mw_current)  
-            
+            k0 = Vw0 / V
+
             if Vw > 0:
                 
-                v_e = water_exit_velocity(Vw/V, p_in)
+                v_e = water_exit_velocity(Vw/V, k0, _p_ino)
                 F_thrust = Thrust(v_e)
                 #print(F_thrust)
             else:
@@ -108,11 +109,11 @@ def equation_vel(v, Vw, p_in):
                 dv_dt = (-F_drag - F_weight) / mb
             return dv_dt, (F_thrust)
             
-def equation_vel_air(v, Vw, p_in):
+def equation_vel_air(v, Vw, p_in, _p_ino):
             
             F_drag = Drag(v)
             F_weight = Weight(0)
-            T_air = T_initial * (p_in / p_ino) ** ((gamma - 1) / gamma)
+            T_air = T_initial * (p_in / _p_ino) ** ((gamma - 1) / gamma)
             
             if p_in > patm:
                 pressure_ratio = p_in / patm
@@ -128,11 +129,12 @@ def equation_vel_air(v, Vw, p_in):
             
             return dv_dt, F_thrust
 
-def equation_water_volume(v, Vw):
+def equation_water_volume(v, Vw, _p_ino, Vw0):
 
     k = Vw / V                            # calculate the ratio of remaining water 
-    p_in = internal_pressure(Vw)
-    v_e = water_exit_velocity(k, p_in)
+    k0 = Vw0 / V                          # calculate the ratio of initial water
+    p_in = internal_pressure(_p_ino, Vw, Vw0)
+    v_e = water_exit_velocity(k, k0, _p_ino)
     dVw_dt = -Ae * v_e        # rate of change of water volume
     return dVw_dt
 
@@ -219,7 +221,7 @@ def graphMathPlot(Times, dataIn, additionalValues=None):
 
 
 
-def Rungekutta(stepNbr=5000):
+def Rungekutta(_Vw0, _p_ino, stepNbr=5000):
     """
     stepNbr : number of points in the simulation
     """
@@ -228,7 +230,12 @@ def Rungekutta(stepNbr=5000):
     t0 = 0.00001 # Initial time
     h0 = 0.00001 # Initial height
     v0 = 0 # Initial velocity
-    Vw0 = 0.0005
+    Vw0 = _Vw0 # Initial water volume
+    p_ino = _p_ino # Initial pressure
+
+    mw = rho_w * Vw0
+    k = Vw0 /V
+    k0 = Vw0/V
     
     def systeme_complet(t, y):
         """
@@ -244,7 +251,7 @@ def Rungekutta(stepNbr=5000):
         
         # Équation de volume d'eau
         if Vw > 0.0000000001:  # Éviter les valeurs négatives
-            dVw_dt = equation_water_volume(v, Vw)
+            dVw_dt = equation_water_volume(v, Vw, _p_ino, Vw0)
             
         else:
             dVw_dt = 0
@@ -252,9 +259,9 @@ def Rungekutta(stepNbr=5000):
         
         # Équation de vitesse
         if Vw > 0.0000000001:
-            p_in_next = internal_pressure(Vw)
+            p_in_next = internal_pressure(_p_ino, Vw, Vw0)
             dp_in_dt = (p_in_next - p_in) / deltaT
-            dv_dt, F = equation_vel(v, Vw, p_in)
+            dv_dt, F = equation_vel(v, Vw, Vw0, p_ino)
             
         else:
             dh_dt = v
@@ -264,7 +271,7 @@ def Rungekutta(stepNbr=5000):
                  dp_in_dt = 0
                  p_in = patm
             
-            dv_dt, F = equation_vel_air(v, Vw, p_in)
+            dv_dt, F = equation_vel_air(v, Vw, p_in, _p_ino)
 
         return [dh_dt, dv_dt, dVw_dt, dp_in_dt, F]
     
@@ -283,8 +290,8 @@ def Rungekutta(stepNbr=5000):
         y_current = ys[-1]
         #print(y_current[0])
         
-        p_in = internal_pressure(y_current[2])
-        v_e = water_exit_velocity(y_current[2]/V, p_in)
+        p_in = internal_pressure(_p_ino, y_current[2], Vw0)
+        v_e = water_exit_velocity(y_current[2]/V, k0, _p_ino)
         F_thrust = Thrust(v_e)
         Fs.append(p_in)
         #print(p_in)
@@ -306,20 +313,73 @@ def Rungekutta(stepNbr=5000):
 
     
     
-    graphMathPlot(ts, ys)
-    # Séparation des résultats
+    #graphMathPlot(ts, ys)
+    # Spliting the results
     hs = [y[0] for y in ys]
     vs = [y[1] for y in ys]
     Vws = [y[2] for y in ys]
     Fs = [y[4] for y in ys]
-    print(Fs)
+    #print(Fs)
     return ts, hs, vs, Vws
 
 
+def RungekuttaMax(x, y):
+    result = Rungekutta(x, y)
+    return max(result[1])
 
 
-
-tsys = Rungekutta()
+#tsys = Rungekutta(0.0007, 500000)
 
 #print(tsys[2])
-txtGraph(tsys[0], tsys[1], "Height.txt")
+#txtGraph(tsys[0], tsys[1], "Height.txt")
+
+
+def graphique_3d_parametres(fonction, x_min, x_max, y_min, y_max, nb_points_x=50, nb_points_y=50):
+    """
+    Crée un graphique 3D d'une fonction à deux paramètres.
+    
+    Paramètres:
+    -----------
+    fonction : function
+        La fonction à évaluer. Doit prendre deux arguments (x, y) et retourner une valeur.
+    x_min, x_max : float
+        Bornes de l'intervalle pour le paramètre x
+    y_min, y_max : float
+        Bornes de l'intervalle pour le paramètre y
+    nb_points_x, nb_points_y : int
+        Nombre de points à générer sur chaque axe (défaut: 50)
+    """
+    
+    # Création des grilles de points
+    x = np.linspace(x_min, x_max, nb_points_x)
+    y = np.linspace(y_min, y_max, nb_points_y)
+    
+    # Création de la grille 2D
+    X, Y = np.meshgrid(x, y)
+    
+    # Calcul des valeurs Z point par point
+    Z = np.zeros_like(X)
+    for i in range(nb_points_x):
+        for j in range(nb_points_y):
+            Z[j, i] = fonction(X[j, i], Y[j, i])
+    
+    # Création de la figure 3D
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111, projection='3d')
+    
+    # Tracé de la surface
+    surface = ax.plot_surface(X, Y, Z, cmap='viridis', alpha=0.8)
+    
+    # Personnalisation du graphique
+    ax.set_xlabel("Volume d'eau (m³)")
+    ax.set_ylabel("Pression d'entrée (Pa)")
+    ax.set_zlabel('Hauteur atteinte')
+    ax.set_title("Evolution de la hauteur atteinte en fonction du volume d'eau et de la pression")
+    
+    # Ajout d'une barre de couleur
+    plt.colorbar(surface, ax=ax, shrink=0.5, aspect=5)
+    
+    plt.show()
+    
+    return fig, ax
+graphique_3d_parametres(RungekuttaMax, 0.0001, 0.0010, 100000, 500000)
