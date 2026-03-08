@@ -1,6 +1,5 @@
 
 import math
-import turtle
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
@@ -220,24 +219,7 @@ def graphMathPlot(Times, dataIn, additionalValues=None):
 
 
 
-
-def Rungekutta(_Vw0, _p_ino, stepNbr=5000):
-    """
-    stepNbr : number of points in the simulation
-    """
-
-    # Initial conditions
-    t0 = 0.00001 # Initial time
-    h0 = 0.00001 # Initial height
-    v0 = 0 # Initial velocity
-    Vw0 = _Vw0 # Initial water volume
-    p_ino = _p_ino # Initial pressure
-
-    mw = rho_w * Vw0
-    k = Vw0 /V
-    k0 = Vw0/V
-    
-    def systeme_complet(t, y):
+def systeme_complet(t, y, _p_ino, deltaT, Vw0):
         """
         Params:
         t = time
@@ -261,7 +243,7 @@ def Rungekutta(_Vw0, _p_ino, stepNbr=5000):
         if Vw > 0.0000000001:
             p_in_next = internal_pressure(_p_ino, Vw, Vw0)
             dp_in_dt = (p_in_next - p_in) / deltaT
-            dv_dt, F = equation_vel(v, Vw, Vw0, p_ino)
+            dv_dt, F = equation_vel(v, Vw, Vw0, _p_ino)
             
         else:
             dh_dt = v
@@ -274,6 +256,24 @@ def Rungekutta(_Vw0, _p_ino, stepNbr=5000):
             dv_dt, F = equation_vel_air(v, Vw, p_in, _p_ino)
 
         return [dh_dt, dv_dt, dVw_dt, dp_in_dt, F]
+
+def Rungekutta(_Vw0, _p_ino, stepNbr=5000):
+    """
+    stepNbr : number of points in the simulation
+    """
+
+    # Initial conditions
+    t0 = 0.00001 # Initial time
+    h0 = 0.00001 # Initial height
+    v0 = 0 # Initial velocity
+    Vw0 = _Vw0 # Initial water volume
+    p_ino = _p_ino # Initial pressure
+
+    mw = rho_w * Vw0
+    k = Vw0 /V
+    k0 = Vw0/V
+    
+    
     
     
     # Initialisation
@@ -296,13 +296,13 @@ def Rungekutta(_Vw0, _p_ino, stepNbr=5000):
         Fs.append(p_in)
         #print(p_in)
         # RK4 standard
-        k1 = systeme_complet(t_current, y_current)
+        k1 = systeme_complet(t_current, y_current, p_ino, deltaT, Vw0)
         
-        k2 = systeme_complet(t_current + deltaT/2, [y_current[j] + deltaT/2 * k1[j] for j in range(4)]+[y_current[4]])
+        k2 = systeme_complet(t_current + deltaT/2, [y_current[j] + deltaT/2 * k1[j] for j in range(4)]+[y_current[4]], p_ino, deltaT, Vw0)
         
-        k3 = systeme_complet(t_current + deltaT/2, [y_current[j] + deltaT/2 * k2[j] for j in range(4)]+[y_current[4]])
+        k3 = systeme_complet(t_current + deltaT/2, [y_current[j] + deltaT/2 * k2[j] for j in range(4)]+[y_current[4]], p_ino, deltaT, Vw0)
         
-        k4 = systeme_complet(t_current + deltaT, [y_current[j] + deltaT * k3[j] for j in range(4)]+[y_current[4]])
+        k4 = systeme_complet(t_current + deltaT, [y_current[j] + deltaT * k3[j] for j in range(4)]+[y_current[4]], p_ino, deltaT, Vw0)
         
         # Mise à jour
         y_new = [y_current[j] + deltaT/6 * (k1[j] + 2*k2[j] + 2*k3[j] + k4[j]) for j in range(4)]+[k1[4]]
@@ -351,6 +351,9 @@ def graphique_3d_parametres(fonction, x_min, x_max, y_min, y_max, nb_points_x=50
     """
     
     # Création des grilles de points
+    maxVolume = 0
+    maxHeight = 0
+    
     x = np.linspace(x_min, x_max, nb_points_x)
     y = np.linspace(y_min, y_max, nb_points_y)
     
@@ -359,10 +362,16 @@ def graphique_3d_parametres(fonction, x_min, x_max, y_min, y_max, nb_points_x=50
     
     # Calcul des valeurs Z point par point
     Z = np.zeros_like(X)
-    for i in range(nb_points_x):
-        for j in range(nb_points_y):
+    for i in range(nb_points_y):
+        for j in range(nb_points_x):
             Z[j, i] = fonction(X[j, i], Y[j, i])
-    
+            if Z[j, i] > maxHeight:
+                maxHeight = Z[j, i]
+                maxVolume = X[j, i]
+            else:
+                print(maxVolume)
+        
+        
     # Création de la figure 3D
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111, projection='3d')
