@@ -30,7 +30,10 @@ T_initial = 293.15  # 20°C
 mb = float(0.3)             # Masse structurelle (kg)
 #Vw0 = float(0.0009)              # Volume d'eau initial dans la fusée
 
-
+#=============================================================
+#--------------------MODEL CORECTION--------------------------
+#=============================================================
+ForceOffset = 0#-7
 
 # ============================================================
 #  FORCES EN PRESENCE
@@ -56,6 +59,7 @@ def Thrust(v_e):
     calculate the thrust force based on the exit velocity of water
     """
     F_thrust = rho_w * Ae * v_e**2
+    F_thrust = max(F_thrust+ForceOffset, 0)
     return F_thrust
 # ============================================================
 def internal_pressure(_p_ino, Vw, Vw0):
@@ -120,6 +124,7 @@ def equation_vel_air(v, Vw, p_in, _p_ino):
                 # Vitesse d'éjection
                 v_e = math.sqrt(2 * gamma / (gamma - 1) * R_air * T_air * (1 - (1 / pressure_ratio) ** ((gamma - 1) / gamma)))
                 F_thrust = Ae * v_e**2 
+                
                 
             else:
                 F_thrust = 0
