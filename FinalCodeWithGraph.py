@@ -19,7 +19,7 @@ R_air = 287.05
 # Paramètres géométriques et initiaux du rocket
 #les noms avec o sont des paramètres à t = 0s (on peut pas mettre 0 dans la variable donc o = initial, tandis que "in" comme dans p_ino est pour "intérieur" ou "interne")
 # les paramètres qu'on ne connait pas sont notés float pour l'instant
-D = float(0.1)               # Diamètre de la fusée (m)
+D = float(0.09)               # Diamètre de la fusée (m)
 De = float(0.008)            # Diamètre de la buse (m)
 A = math.pi * (D / 2)**2     # Aire frontale du rocket (m²)
 Ae = math.pi * (De / 2)**2   # Aire de la buse (m²)
@@ -76,13 +76,13 @@ def internal_pressure(_p_ino, Vw, Vw0):
     else:
         return 0 
 
-def water_exit_velocity(k, k0, _p_ino):
+def water_exit_velocity(_p_in):
     """
     k : ratio of remaining water volume to total volume
     p_in : internal pressure
     """
     try:
-        v_e = ((2*(_p_ino*((1-k0)/(1-k))**(gamma))-patm)/((rho_w)*(1-((Ae)/(A))**2)))**(1/2) #calculate the exit velocity of water based on bernouilli's equation
+        v_e = ((2*(_p_in-patm))/((rho_w)*(1-(Ae/A)**2)))**(1/2) #calculate the exit velocity of water based on bernouilli's equation
         #  OTHER BERNOUILLI EQUATION  #
         #delta_P = p_in - patm
         #v_e = (2.0 * delta_P / (rho_w*(1-(Ae/A)**2)))**(1/2) #calculate the exit velocity of water based on bernouilli's equation
@@ -96,11 +96,12 @@ def equation_vel(v, Vw, Vw0, _p_ino):
             mw_current = rho_w * Vw  # Masse d'eau actuelle
             F_drag = Drag(v)
             F_weight = Weight(mw_current)  
+            p_in = internal_pressure(_p_ino, Vw, Vw0)
             k0 = Vw0 / V
 
             if Vw > 0:
                 
-                v_e = water_exit_velocity(Vw/V, k0, _p_ino)
+                v_e = water_exit_velocity(p_in)
                 F_thrust = Thrust(v_e)
                 #print(F_thrust)
             else:
@@ -133,12 +134,9 @@ def equation_vel_air(v, Vw, p_in, _p_ino):
             
             return dv_dt, F_thrust
 
-def equation_water_volume(v, Vw, _p_ino, Vw0):
+def equation_water_volume(_p_in):
 
-    k = Vw / V                            # calculate the ratio of remaining water 
-    k0 = Vw0 / V                          # calculate the ratio of initial water
-    p_in = internal_pressure(_p_ino, Vw, Vw0)
-    v_e = water_exit_velocity(k, k0, _p_ino)
+    v_e = water_exit_velocity(_p_in)
     dVw_dt = -Ae * v_e        # rate of change of water volume
     return dVw_dt
 
@@ -232,13 +230,13 @@ def systeme_complet(t, y, _p_ino, deltaT, Vw0):
         return [dh_dt, dv_dt, dVw_dt, dp_in_dt, F]
         """
         h, v, Vw, p_in, F = y
-        
+        _p_ino = _p_ino + patm
         # Équation de position
         dh_dt = v
-        
+        p_in_next = internal_pressure(_p_ino, Vw, Vw0)
         # Équation de volume d'eau
         if Vw > 0.0000000001:  # Éviter les valeurs négatives
-            dVw_dt = equation_water_volume(v, Vw, _p_ino, Vw0)
+            dVw_dt = equation_water_volume(p_in)
             
         else:
             dVw_dt = 0
@@ -246,7 +244,7 @@ def systeme_complet(t, y, _p_ino, deltaT, Vw0):
         
         # Équation de vitesse
         if Vw > 0.0000000001:
-            p_in_next = internal_pressure(_p_ino, Vw, Vw0)
+            
             dp_in_dt = (p_in_next - p_in) / deltaT
             dv_dt, F = equation_vel(v, Vw, Vw0, _p_ino)
             
@@ -296,7 +294,7 @@ def Rungekutta(_Vw0, _p_ino, stepNbr=5000):
         #print(y_current[0])
         
         p_in = internal_pressure(_p_ino, y_current[2], Vw0)
-        v_e = water_exit_velocity(y_current[2]/V, k0, _p_ino)
+        v_e = water_exit_velocity(p_in)
         F_thrust = Thrust(v_e)
         Fs.append(p_in)
         #print(p_in)
