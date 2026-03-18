@@ -86,7 +86,7 @@ def water_exit_velocity(_p_in):
         #  OTHER BERNOUILLI EQUATION  #
         #delta_P = p_in - patm
         #v_e = (2.0 * delta_P / (rho_w*(1-(Ae/A)**2)))**(1/2) #calculate the exit velocity of water based on bernouilli's equation
-        
+        print(v_e)
         return v_e
     except:
         return 0
@@ -249,18 +249,17 @@ def systeme_complet(t, y, _p_ino, deltaT, Vw0):
             dv_dt, F = equation_vel(v, Vw, Vw0, _p_ino)
             
         else:
-            dh_dt = v
             if p_in > patm: 
                 dp_in_dt = -70000*(1/t)
             else:
                  dp_in_dt = 0
-                 p_in = patm
+
             
             dv_dt, F = equation_vel_air(v, Vw, p_in, _p_ino)
 
         return [dh_dt, dv_dt, dVw_dt, dp_in_dt, F]
 
-def Rungekutta(_Vw0, _p_ino, stepNbr=5000):
+def Rungekutta(_Vw0, _p_ino, stepNbr=50000):
     """
     stepNbr : number of points in the simulation
     """
