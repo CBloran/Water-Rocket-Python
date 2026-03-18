@@ -3,7 +3,7 @@ import math
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
-
+import json
 # ============================================================
 # CONSTANTES PHYSIQUES ET PARAMÈTRES DU ROCKET À EAU
 # ============================================================
@@ -281,7 +281,7 @@ def Rungekutta(_Vw0, _p_ino, stepNbr=5000):
     Fs = [0]
     ys = [[h0, v0, Vw0, p_ino, 0]]  # Stocker toutes les variables dans une liste
     
-    deltaT = 0.01  # Pas de temps constant
+    deltaT = 0.001  # Pas de temps constant
     i = 0
     
     while ys[-1][0] > 0 and i < stepNbr :
@@ -319,6 +319,16 @@ def Rungekutta(_Vw0, _p_ino, stepNbr=5000):
     vs = [y[1] for y in ys]
     Vws = [y[2] for y in ys]
     Fs = [y[4] for y in ys]
+
+    with open("height.json", "w", encoding="utf-8") as f :
+        for y in ys :
+            strin = str(y)
+            f.write(strin + "\n")
+    with open("time", "w", encoding="utf-8") as f:
+        for t in ts :
+            strin = str(t)
+            f.write(strin + "\n")
+
     #print(Fs)
     return ts, ys
 
@@ -393,10 +403,37 @@ def graphique_3d_parametres(fonction, x_min, x_max, y_min, y_max, nb_points_x=50
     return fig, ax
 #graphique_3d_parametres(RungekuttaMax, 0.0001, 0.0010, 100000, 500000)
 
+def batch():
+    array = []
+    i = 100000
+    while i <= 500000:
+        print(i)
+        hmax = RungekuttaMax(0.0005, i)
+        array.append([i, hmax])
+        i += 1000
+    with open("AllPressure.txt", "w", encoding="utf-8") as f:
+        for y in array:
+            strin = str(y)
+            strin = strin.replace("[", "")
+            strin = strin.replace("]", "")
+            
+            f.write(strin + "\n")
+
+def FinBestPressure(Height):
+    with open("AllPressure.txt", "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                array = line.split(",")
+                if float(array[1]) >= Height:
+                    return float(array[0])
+
 if __name__ == "__main__":
     print("Veuillez choisir le mode d'execution :")
     print("1. Mode Volume d'eau constant")
     print("2. Mode graphique 3D")
+    print("3. Géneration du résumer pression - hauteur")
+    print("4. Trouver la meilleur pression pour la hauteur")
     choice = int(input())
     if choice == 1:
         print("Veuillez entrer le volume d'eau (en L) :")
@@ -408,3 +445,9 @@ if __name__ == "__main__":
         graphMathPlot(tsys[0], tsys[1])
     elif choice == 2:
         graphique_3d_parametres(RungekuttaMax, 0.0001, 0.0010, 100000, 500000)
+    elif choice == 3:
+        batch()
+    elif choice == 4:
+        print("Veuillez entrer la hauteur maximale souhaitée (en m) :")
+        Height = float(input())
+        print("La pression d'entrée optimale pour atteindre une hauteur de ", Height, "m est de : ", FinBestPressure(Height), "Pa")
