@@ -82,7 +82,7 @@ def equation_water_mass(v_e):
     v_e : water ejection velocity
     Calculate the mass of water in the rocket based on the internal pressure
     """
-    dmw_dt = rho_w * Ae * v_e
+    dmw_dt = -rho_w * Ae * v_e
     return dmw_dt
 
 def equation_vel_air(v, p_in, _p_ino):
@@ -100,12 +100,12 @@ def equation_vel_air(v, p_in, _p_ino):
             # Écoulement sonique (bloqué)
             v_e = math.sqrt(gamma * R_air * T_air)
             rho_e = (p_in / (R_air * T_air)) * (2 / (gamma + 1)) ** (1 / (gamma - 1))
-            F_thrust = Ae * (rho_e * v_e**2 + (p_in * (2/(gamma+1))**(gamma/(gamma-1)) - patm))
+            F_thrust = 0#Ae * (rho_e * v_e**2 + (p_in * (2/(gamma+1))**(gamma/(gamma-1)) - patm))
         else:
             # Écoulement subsonique
             v_e = math.sqrt(2 * gamma * R_air * T_air / (gamma - 1) * 
                           (1 - (patm / p_in) ** ((gamma - 1) / gamma)))
-            F_thrust = Ae * v_e**2  # Approximation
+            F_thrust = 0#Ae * v_e**2  # Approximation
     else:
         F_thrust = 0
         v_e = 0
@@ -139,7 +139,7 @@ def systeme_complet(t, y, _p_ino, deltaT, mw0):
             else:
                 return 0 
             
-        h, v, v_e, mw, p_in, F = y
+        h, v, mw, v_e, p_in, F = y
 
         NextP_in = internal_pressure(mw)
         dm_dt = equation_water_mass(v_e)
@@ -150,7 +150,7 @@ def systeme_complet(t, y, _p_ino, deltaT, mw0):
               
         if mw > 0.00000001:
                 Nextv_e = water_exit_velocity(p_in)
-                dv_e_dt = (Nextv_e - v_e) / deltaT
+                
                 F_thrust = Thrust(v_e)
                 F = F_thrust - F_weight
                 dv_dt = (F-F_drag)/(mb + mw)
@@ -158,11 +158,11 @@ def systeme_complet(t, y, _p_ino, deltaT, mw0):
         elif p_in > patm:
             
             F_thrust, Nextv_e = equation_vel_air(v, p_in, _p_ino)
-            dv_e_dt = (Nextv_e - v_e) / deltaT
+            
             dv_dt = (F_thrust-F_weight -F_drag)/(mb + mw)
             F = F_thrust - F_weight
         else:
-            dv_e_dt = 0
+            Nextv_e = 0
             dv_dt = (-F_weight -F_drag)/(mb + mw)
             F = -F_weight
 
@@ -171,7 +171,7 @@ def systeme_complet(t, y, _p_ino, deltaT, mw0):
 
 
 
-        return [dh_dt, dv_dt, dv_e_dt, dm_dt, NextP_in, F]
+        return [dh_dt, dv_dt, dm_dt, Nextv_e, NextP_in, F]
 
 
 
@@ -195,7 +195,7 @@ def Rungekutta(_mw0, _p_ino, stepNbr=50000):
     # Initialisation
     ts = [t0]
     Fs = [0]
-    ys = [[h0, v0, 0, mw0, p_ino, 0]]  # Stocker toutes les variables dans une liste
+    ys = [[h0, v0, mw0, 0, p_ino, 0]]  # Stocker toutes les variables dans une liste
     
     deltaT = 0.001  # Pas de temps constant
     i = 0
@@ -211,11 +211,11 @@ def Rungekutta(_mw0, _p_ino, stepNbr=50000):
         # RK4 standard
         k1 = systeme_complet(t_current, y_current, p_ino, deltaT, mw0)
         
-        k2 = systeme_complet(t_current + deltaT/2, [y_current[j] + deltaT/2 * k1[j] for j in range(4)]+[y_current[4]]+[k1[4]], p_ino, deltaT, Vw0)
+        k2 = systeme_complet(t_current + deltaT/2, [y_current[j] + deltaT/2 * k1[j] for j in range(4)]+[y_current[4]]+[k1[4]]+[k1[5]], p_ino, deltaT/2, Vw0)
         
-        k3 = systeme_complet(t_current + deltaT/2, [y_current[j] + deltaT/2 * k2[j] for j in range(4)]+[y_current[4]]+[k1[4]], p_ino, deltaT, Vw0)
+        k3 = systeme_complet(t_current + deltaT/2, [y_current[j] + deltaT/2 * k2[j] for j in range(4)]+[y_current[4]]+[k1[4]]+[k1[5]], p_ino, deltaT/2, Vw0)
         
-        k4 = systeme_complet(t_current + deltaT, [y_current[j] + deltaT * k3[j] for j in range(4)]+[y_current[4]]+[k1[4]], p_ino, deltaT, Vw0)
+        k4 = systeme_complet(t_current + deltaT, [y_current[j] + deltaT * k3[j] for j in range(4)]+[y_current[4]]+[k1[4]]+[k1[5]], p_ino, deltaT, Vw0)
         
         # Mise à jour
         y_new = [y_current[j] + deltaT/6 * (k1[j] + 2*k2[j] + 2*k3[j] + k4[j]) for j in range(4)]+[k1[4]] + [k1[5]]
@@ -404,8 +404,8 @@ if __name__ == "__main__":
     print("4. Trouver la meilleur pression pour la hauteur")
     choice = int(input())
     if choice == 1:
-        print("Veuillez entrer le volume d'eau (en L) :")
-        Vw0 = float(input())/1000
+        print("Veuillez entrer le masse d'eau (en kg) :")
+        Vw0 = float(input())
         print("Veuillez entrer la pression d'entrée (en Pa) :")
         p_ino = float(input())
         tsys = Rungekutta(Vw0, p_ino)

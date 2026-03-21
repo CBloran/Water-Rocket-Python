@@ -70,11 +70,8 @@ def internal_pressure(_p_ino, Vw, Vw0):
     Va = V - Vw  # remaining air volume
     Vao = V - Vw0  # initial air volume
 
-    if Va > 0:
-        p_in = _p_ino * (Vao / Va)**gamma # calculate the remaining internal pressure based on adiabatic law
-        return p_in
-    else:
-        return 0 
+    p_in = _p_ino * (Vao / Va)**gamma # calculate the remaining internal pressure based on adiabatic law
+    return p_in
 
 def water_exit_velocity(_p_in):
     """
@@ -82,11 +79,12 @@ def water_exit_velocity(_p_in):
     p_in : internal pressure
     """
     try:
-        v_e = ((2*(_p_in-patm))/((rho_w)*(1-(Ae/A)**2)))**(1/2) #calculate the exit velocity of water based on bernouilli's equation
+        #v_e = ((2*(_p_in-patm))/((rho_w)*(1-(Ae/A)**2)))**(1/2) #calculate the exit velocity of water based on bernouilli's equation
         #  OTHER BERNOUILLI EQUATION  #
         #delta_P = p_in - patm
         #v_e = (2.0 * delta_P / (rho_w*(1-(Ae/A)**2)))**(1/2) #calculate the exit velocity of water based on bernouilli's equation
-        print(v_e)
+        v_e = math.sqrt(2*(_p_in-patm)/rho_w)
+        
         return v_e
     except:
         return 0
@@ -102,7 +100,7 @@ def equation_vel(v, Vw, Vw0, _p_ino):
             if Vw > 0:
                 
                 v_e = water_exit_velocity(p_in)
-                F_thrust = Thrust(v_e)
+                F_thrust = Thrust(v_e) + Ae*(p_in - patm)
                 #print(F_thrust)
             else:
                 F_thrust = 0
@@ -124,7 +122,7 @@ def equation_vel_air(v, Vw, p_in, _p_ino):
                 
                 # Vitesse d'éjection
                 v_e = math.sqrt(2 * gamma / (gamma - 1) * R_air * T_air * (1 - (1 / pressure_ratio) ** ((gamma - 1) / gamma)))
-                F_thrust = Ae * v_e**2 
+                F_thrust = rho_atm *Ae * v_e**2 
                 
                 
             else:
@@ -230,7 +228,7 @@ def systeme_complet(t, y, _p_ino, deltaT, Vw0):
         return [dh_dt, dv_dt, dVw_dt, dp_in_dt, F]
         """
         h, v, Vw, p_in, F = y
-        _p_ino = _p_ino + patm
+        
         # Équation de position
         dh_dt = v
         p_in_next = internal_pressure(_p_ino, Vw, Vw0)
@@ -269,7 +267,7 @@ def Rungekutta(_Vw0, _p_ino, stepNbr=50000):
     h0 = 0.00001 # Initial height
     v0 = 0 # Initial velocity
     Vw0 = _Vw0 # Initial water volume
-    p_ino = _p_ino # Initial pressure
+    p_ino = _p_ino + patm # Initial pressure
 
     mw = rho_w * Vw0
     k = Vw0 /V
@@ -312,7 +310,7 @@ def Rungekutta(_Vw0, _p_ino, stepNbr=50000):
         ts.append(t_current + deltaT)
         ys.append(y_new)
 
-
+        
     
     
     #graphMathPlot(ts, ys)
@@ -381,7 +379,7 @@ def graphique_3d_parametres(fonction, x_min, x_max, y_min, y_max, nb_points_x=50
                 maxHeight = Z[j, i]
                 maxVolume = X[j, i]
             else:
-                print(maxVolume)
+                
         
         
     # Création de la figure 3D
